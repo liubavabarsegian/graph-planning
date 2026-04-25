@@ -1,0 +1,14 @@
+# Environment
+.env
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Go build artifacts
+services/*/server
+
+# IDE
+.idea/
+.vscode/
+*.DS_Store

@@ -1,0 +1,23 @@
+services:
+  chat-service:
+    build: ./services/chat-service
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  graph-service:
+    build: ./services/graph-service
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - chat-service
+      - graph-service
+    restart: unless-stopped
