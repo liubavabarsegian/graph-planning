@@ -1,9 +1,31 @@
+import { useState } from 'react'
 import { Typography } from 'antd'
 import { ChatPanel } from './components/ChatPanel/ChatPanel'
+import { GraphPanel } from './components/GraphPanel/GraphPanel'
+import type { Task, GraphNode, GraphEdge } from './types'
+import { createPlan } from './api/graph'
 
 const { Title, Text } = Typography
 
 export function App() {
+  const [planId, setPlanId] = useState<string | null>(null)
+  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([])
+  const [graphEdges, setGraphEdges] = useState<GraphEdge[]>([])
+  const [graphError, setGraphError] = useState<string | null>(null)
+
+  const handlePlanReady = async (tasks: Task[]) => {
+    setGraphError(null)
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const graph = await createPlan(tasks, today)
+      setPlanId(graph.plan_id)
+      setGraphNodes(graph.nodes)
+      setGraphEdges(graph.edges)
+    } catch (err) {
+      setGraphError(err instanceof Error ? err.message : 'Ошибка создания графа')
+    }
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#fafafa' }}>
       {/* Левая колонка: чат */}
@@ -19,44 +41,22 @@ export function App() {
         }}
       >
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f0f0' }}>
-          <Title level={4} style={{ margin: 0 }}>
-            Goal Planner
-          </Title>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Опишите цель — получите план
-          </Text>
+          <Title level={4} style={{ margin: 0 }}>Goal Planner</Title>
+          <Text type="secondary" style={{ fontSize: 12 }}>Опишите цель — получите план</Text>
         </div>
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <ChatPanel />
+          <ChatPanel onPlanReady={handlePlanReady} graphError={graphError} />
         </div>
       </div>
 
-      {/* Правая колонка: заглушка для графа */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 8,
-          color: '#bbb',
-        }}
-      >
-        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="32" r="8" stroke="#d9d9d9" strokeWidth="2" />
-          <circle cx="32" cy="12" r="8" stroke="#d9d9d9" strokeWidth="2" />
-          <circle cx="32" cy="52" r="8" stroke="#d9d9d9" strokeWidth="2" />
-          <circle cx="52" cy="32" r="8" stroke="#d9d9d9" strokeWidth="2" />
-          <line x1="20" y1="32" x2="24" y2="32" stroke="#d9d9d9" strokeWidth="2" />
-          <line x1="32" y1="20" x2="32" y2="24" stroke="#d9d9d9" strokeWidth="2" />
-          <line x1="32" y1="40" x2="32" y2="44" stroke="#d9d9d9" strokeWidth="2" />
-          <line x1="40" y1="32" x2="44" y2="32" stroke="#d9d9d9" strokeWidth="2" />
-        </svg>
-        <Text type="secondary">Граф зависимостей появится здесь</Text>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          (реализуется на следующем этапе)
-        </Text>
+      {/* Правая колонка: граф */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <GraphPanel
+          planId={planId}
+          nodes={graphNodes}
+          edges={graphEdges}
+          onNodesUpdate={setGraphNodes}
+        />
       </div>
     </div>
   )

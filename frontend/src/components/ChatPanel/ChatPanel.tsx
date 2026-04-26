@@ -6,7 +6,12 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { TaskPreview } from './TaskPreview'
 
-export function ChatPanel() {
+interface Props {
+  onPlanReady: (tasks: Task[]) => void
+  graphError: string | null
+}
+
+export function ChatPanel({ onPlanReady, graphError }: Props) {
   const [messages, setMessages] = useState<HistoryMessage[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
@@ -28,6 +33,7 @@ export function ChatPanel() {
 
       if (response.plan) {
         setTasks(response.plan.tasks)
+        onPlanReady(response.plan.tasks)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Что-то пошло не так')
@@ -45,6 +51,14 @@ export function ChatPanel() {
           type="error"
           closable
           onClose={() => setError(null)}
+          style={{ margin: '0 16px 8px' }}
+        />
+      )}
+      {graphError && (
+        <Alert
+          message={`Ошибка графа: ${graphError}`}
+          type="warning"
+          closable
           style={{ margin: '0 16px 8px' }}
         />
       )}

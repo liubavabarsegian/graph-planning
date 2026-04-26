@@ -1,4 +1,27 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: graphplanning
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/password
+    volumes:
+      - neo4j_data:/data
+    restart: unless-stopped
+
   chat-service:
     build: ./services/chat-service
     ports:
@@ -11,6 +34,11 @@ services:
     build: ./services/graph-service
     ports:
       - "8081:8081"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - neo4j
     restart: unless-stopped
 
   frontend:
@@ -21,3 +49,7 @@ services:
       - chat-service
       - graph-service
     restart: unless-stopped
+
+volumes:
+  pg_data:
+  neo4j_data:
