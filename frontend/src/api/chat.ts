@@ -1,4 +1,5 @@
 import type { ChatResponse, HistoryMessage } from '../types'
+import { getToken } from './auth'
 
 export async function sendMessage(
   message: string,
@@ -6,7 +7,10 @@ export async function sendMessage(
 ): Promise<ChatResponse> {
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getToken()}`,
+    },
     body: JSON.stringify({ message, history }),
   })
 

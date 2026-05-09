@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,19 @@ func NewGraphHandler(svc *service.GraphService) *GraphHandler {
 	return &GraphHandler{svc: svc}
 }
 
-// CreatePlan обрабатывает POST /api/graph/plans.
+// CreatePlan godoc
+//
+//	@Summary		Создать план из списка задач
+//	@Tags			graph
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			body	body		models.CreatePlanRequest	true	"Список задач и дата начала"
+//	@Success		201		{object}	models.GraphResponse
+//	@Failure		400		{object}	map[string]string
+//	@Failure		401		{object}	map[string]string
+//	@Failure		422		{object}	map[string]string
+//	@Router			/api/graph/plans [post]
 func (h *GraphHandler) CreatePlan(c *gin.Context) {
 	var req models.CreatePlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -38,7 +51,8 @@ func (h *GraphHandler) CreatePlan(c *gin.Context) {
 		startDate = parsed
 	}
 
-	resp, err := h.svc.CreatePlan(c.Request.Context(), req.Tasks, startDate)
+	userID, _ := c.Get("userID")
+	resp, err := h.svc.CreatePlan(c.Request.Context(), userID.(string), req.Tasks, startDate)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if isClientError(err) {
@@ -51,7 +65,17 @@ func (h *GraphHandler) CreatePlan(c *gin.Context) {
 	c.JSON(http.StatusCreated, resp)
 }
 
-// GetPlan обрабатывает GET /api/graph/plans/:id.
+// GetPlan godoc
+//
+//	@Summary		Получить план по ID
+//	@Tags			graph
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"Plan ID"
+//	@Success		200	{object}	models.GraphResponse
+//	@Failure		401	{object}	map[string]string
+//	@Failure		404	{object}	map[string]string
+//	@Router			/api/graph/plans/{id} [get]
 func (h *GraphHandler) GetPlan(c *gin.Context) {
 	planID := c.Param("id")
 	if planID == "" {
@@ -59,7 +83,8 @@ func (h *GraphHandler) GetPlan(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.svc.GetPlan(c.Request.Context(), planID)
+	userID, _ := c.Get("userID")
+	resp, err := h.svc.GetPlan(c.Request.Context(), userID.(string), planID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -68,7 +93,21 @@ func (h *GraphHandler) GetPlan(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// UpdateTask обрабатывает PATCH /api/graph/plans/:id/tasks/:taskId.
+// UpdateTask godoc
+//
+//	@Summary		Обновить задачу и пересчитать граф
+//	@Tags			graph
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		string						true	"Plan ID"
+//	@Param			taskId	path		string						true	"Task ID"
+//	@Param			body	body		models.UpdateTaskRequest	true	"Обновляемые поля задачи"
+//	@Success		200		{object}	models.UpdateTaskResponse
+//	@Failure		400		{object}	map[string]string
+//	@Failure		401		{object}	map[string]string
+//	@Failure		422		{object}	map[string]string
+//	@Router			/api/graph/plans/{id}/tasks/{taskId} [patch]
 func (h *GraphHandler) UpdateTask(c *gin.Context) {
 	planID := c.Param("id")
 	taskID := c.Param("taskId")
@@ -79,7 +118,8 @@ func (h *GraphHandler) UpdateTask(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.svc.UpdateTask(c.Request.Context(), planID, taskID, req)
+	userID, _ := c.Get("userID")
+	resp, err := h.svc.UpdateTask(c.Request.Context(), userID.(string), planID, taskID, req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if isClientError(err) {
@@ -97,18 +137,7 @@ func isClientError(err error) bool {
 		return false
 	}
 	msg := err.Error()
-	return contains(msg, "cycle detected") || contains(msg, "invalid graph") || contains(msg, "not found")
-}
-
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsStr(s, sub))
-}
-
-func containsStr(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(msg, "cycle detected") ||
+		strings.Contains(msg, "invalid graph") ||
+		strings.Contains(msg, "not found")
 }

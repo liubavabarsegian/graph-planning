@@ -1,13 +1,26 @@
+// @title			Chat Service API
+// @version		1.0
+// @description	Сервис обработки сообщений пользователя и декомпозиции целей через LLM
+// @host			localhost:8080
+// @BasePath		/
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
 package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
+	_ "chat-service/docs"
 	"chat-service/internal/handler"
 	"chat-service/internal/llm"
+	"chat-service/internal/middleware"
 	"chat-service/internal/service"
 )
 
@@ -15,6 +28,9 @@ func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		log.Fatal("OPENAI_API_KEY environment variable is required")
+	}
+	if os.Getenv("JWT_SECRET") == "" {
+		log.Fatal("JWT_SECRET environment variable is required")
 	}
 
 	model := os.Getenv("OPENAI_MODEL")
@@ -36,19 +52,24 @@ func main() {
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 		c.Next()
 	})
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "chat-service"})
 	})
 
-	r.POST("/api/chat", chatHandler.Handle)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	api := r.Group("/api", middleware.RequireAuth())
+	{
+		api.POST("/chat", chatHandler.Handle)
+	}
 
 	log.Printf("chat-service starting on :%s", port)
 	if err := r.Run(":" + port); err != nil {

@@ -1,0 +1,107 @@
+basePath: /
+definitions:
+  models.ChatRequest:
+    properties:
+      history:
+        items:
+          $ref: '#/definitions/models.HistoryMessage'
+        type: array
+      message:
+        type: string
+    required:
+    - message
+    type: object
+  models.ChatResponse:
+    properties:
+      plan:
+        allOf:
+        - $ref: '#/definitions/models.Plan'
+        description: nil, если план ещё не готов
+      reply:
+        type: string
+    type: object
+  models.HistoryMessage:
+    properties:
+      content:
+        type: string
+      role:
+        description: '"user" | "assistant"'
+        type: string
+    type: object
+  models.Plan:
+    properties:
+      tasks:
+        items:
+          $ref: '#/definitions/models.Task'
+        type: array
+    type: object
+  models.Task:
+    properties:
+      dependencies:
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      duration_days:
+        type: integer
+      id:
+        type: string
+      title:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Сервис обработки сообщений пользователя и декомпозиции целей через
+    LLM
+  title: Chat Service API
+  version: "1.0"
+paths:
+  /api/chat:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Сообщение и история диалога
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChatRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ChatResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Отправить сообщение и получить план задач
+      tags:
+      - chat
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

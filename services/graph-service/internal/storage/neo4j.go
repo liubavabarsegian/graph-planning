@@ -127,12 +127,22 @@ func (s *Neo4jStore) GetPlan(ctx context.Context, planID string) ([]models.Graph
 	return nodes, nil
 }
 
-// UpdateTask обновляет свойства задачи и пересчитывает даты всех затронутых узлов.
+// UpdateTask обновляет свойства всех задач плана и пересоздаёт рёбра зависимостей.
 func (s *Neo4jStore) UpdateTask(ctx context.Context, planID, taskID string, updatedNodes []models.GraphNode) error {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 
 	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Удаляем все старые рёбра плана
+		_, err := tx.Run(ctx, `
+			MATCH (t:Task {plan_id: $planID})-[r:DEPENDS_ON]->()
+			DELETE r
+		`, map[string]any{"planID": planID})
+		if err != nil {
+			return nil, err
+		}
+
+		// Обновляем свойства узлов
 		for _, n := range updatedNodes {
 			_, err := tx.Run(ctx, `
 				MATCH (t:Task {id: $id, plan_id: $planID})
@@ -154,6 +164,25 @@ func (s *Neo4jStore) UpdateTask(ctx context.Context, planID, taskID string, upda
 				return nil, err
 			}
 		}
+
+		// Пересоздаём рёбра зависимостей
+		for _, n := range updatedNodes {
+			for _, depID := range n.Dependencies {
+				_, err := tx.Run(ctx, `
+					MATCH (dep:Task {id: $depID, plan_id: $planID})
+					MATCH (cur:Task {id: $curID, plan_id: $planID})
+					MERGE (dep)-[:DEPENDS_ON]->(cur)
+				`, map[string]any{
+					"depID":  depID,
+					"curID":  n.ID,
+					"planID": planID,
+				})
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		return nil, nil
 	})
 
@@ -184,8 +213,8 @@ func nodeFromProps(props map[string]any, depsRaw any) (models.GraphNode, error) 
 		Title:        getString(props, "title"),
 		Description:  getString(props, "description"),
 		DurationDays: getInt(props, "duration_days"),
-		StartDate:    startDate,
-		EndDate:      endDate,
+		StartDate:    models.DateOnly{Time: startDate},
+		EndDate:      models.DateOnly{Time: endDate},
 		IsCritical:   getBool(props, "is_critical"),
 		Dependencies: deps,
 	}, nil

@@ -150,8 +150,8 @@ func BuildGraphNodes(tasks []models.InputTask, dates map[string]*dateRange, crit
 			Title:        t.Title,
 			Description:  t.Description,
 			DurationDays: t.DurationDays,
-			StartDate:    dr.Start,
-			EndDate:      dr.End,
+			StartDate:    models.DateOnly{Time: dr.Start},
+			EndDate:      models.DateOnly{Time: dr.End},
 			IsCritical:   critical[t.ID],
 			Dependencies: t.Dependencies,
 		})

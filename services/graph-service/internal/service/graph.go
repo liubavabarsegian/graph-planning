@@ -24,7 +24,7 @@ func NewGraphService(neo4j *storage.Neo4jStore, postgres *storage.PostgresStore)
 }
 
 // CreatePlan валидирует DAG, вычисляет даты, сохраняет и возвращает граф.
-func (s *GraphService) CreatePlan(ctx context.Context, tasks []models.InputTask, startDate time.Time) (*models.GraphResponse, error) {
+func (s *GraphService) CreatePlan(ctx context.Context, userID string, tasks []models.InputTask, startDate time.Time) (*models.GraphResponse, error) {
 	// 1. Топологическая сортировка (детектирует циклы)
 	order, err := algorithms.TopologicalSort(tasks)
 	if err != nil {
@@ -44,7 +44,7 @@ func (s *GraphService) CreatePlan(ctx context.Context, tasks []models.InputTask,
 	// 5. Сохраняем
 	planID := uuid.New().String()
 
-	if err := s.postgres.SavePlan(ctx, planID, startDate); err != nil {
+	if err := s.postgres.SavePlan(ctx, planID, userID, startDate); err != nil {
 		return nil, fmt.Errorf("save plan meta: %w", err)
 	}
 	if err := s.neo4j.SavePlan(ctx, planID, nodes); err != nil {
@@ -58,8 +58,17 @@ func (s *GraphService) CreatePlan(ctx context.Context, tasks []models.InputTask,
 	}, nil
 }
 
-// GetPlan возвращает граф плана по ID.
-func (s *GraphService) GetPlan(ctx context.Context, planID string) (*models.GraphResponse, error) {
+// GetPlan возвращает граф плана по ID. Проверяет принадлежность плана пользователю.
+func (s *GraphService) GetPlan(ctx context.Context, userID, planID string) (*models.GraphResponse, error) {
+	// Проверяем принадлежность плана
+	meta, err := s.postgres.GetPlan(ctx, planID)
+	if err != nil {
+		return nil, fmt.Errorf("plan not found: %s", planID)
+	}
+	if meta.UserID != "" && meta.UserID != userID {
+		return nil, fmt.Errorf("plan not found: %s", planID)
+	}
+
 	// Получаем узлы из Neo4j
 	nodes, err := s.neo4j.GetPlan(ctx, planID)
 	if err != nil {
@@ -81,7 +90,7 @@ func (s *GraphService) GetPlan(ctx context.Context, planID string) (*models.Grap
 }
 
 // UpdateTask обновляет задачу и каскадно пересчитывает все зависимые задачи.
-func (s *GraphService) UpdateTask(ctx context.Context, planID, taskID string, req models.UpdateTaskRequest) (*models.UpdateTaskResponse, error) {
+func (s *GraphService) UpdateTask(ctx context.Context, userID, planID, taskID string, req models.UpdateTaskRequest) (*models.UpdateTaskResponse, error) {
 	// 1. Загружаем весь план
 	nodes, err := s.neo4j.GetPlan(ctx, planID)
 	if err != nil {
@@ -92,6 +101,11 @@ func (s *GraphService) UpdateTask(ctx context.Context, planID, taskID string, re
 	meta, err := s.postgres.GetPlan(ctx, planID)
 	if err != nil {
 		return nil, fmt.Errorf("get plan meta: %w", err)
+	}
+
+	// Проверяем принадлежность плана
+	if meta.UserID != "" && meta.UserID != userID {
+		return nil, fmt.Errorf("plan not found: %s", planID)
 	}
 
 	// 2. Применяем изменения к целевой задаче

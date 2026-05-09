@@ -1,6 +1,31 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
+
+// DateOnly — обёртка над time.Time, сериализуется/десериализуется как "YYYY-MM-DD".
+type DateOnly struct {
+	time.Time
+}
+
+func (d DateOnly) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + d.Time.Format(time.DateOnly) + `"`), nil
+}
+
+func (d *DateOnly) UnmarshalJSON(data []byte) error {
+	if len(data) < 2 {
+		return fmt.Errorf("invalid date: %s", data)
+	}
+	s := string(data[1 : len(data)-1])
+	t, err := time.Parse(time.DateOnly, s)
+	if err != nil {
+		return fmt.Errorf("parse date %q: %w", s, err)
+	}
+	d.Time = t
+	return nil
+}
 
 // InputTask — задача, пришедшая от фронтенда (из chat-service).
 type InputTask struct {
@@ -13,14 +38,14 @@ type InputTask struct {
 
 // GraphNode — задача с вычисленными датами и флагом критического пути.
 type GraphNode struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	DurationDays int       `json:"duration_days"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	IsCritical   bool      `json:"is_critical"`
-	Dependencies []string  `json:"dependencies"`
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Description  string   `json:"description"`
+	DurationDays int      `json:"duration_days"`
+	StartDate    DateOnly `json:"start_date"`
+	EndDate      DateOnly `json:"end_date"`
+	IsCritical   bool     `json:"is_critical"`
+	Dependencies []string `json:"dependencies"`
 }
 
 // GraphEdge — ориентированное ребро зависимости.

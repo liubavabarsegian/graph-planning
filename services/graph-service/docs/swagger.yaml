@@ -1,0 +1,230 @@
+basePath: /
+definitions:
+  models.CreatePlanRequest:
+    properties:
+      start_date:
+        description: '"YYYY-MM-DD", опционально'
+        type: string
+      tasks:
+        items:
+          $ref: '#/definitions/models.InputTask'
+        type: array
+    required:
+    - tasks
+    type: object
+  models.DateOnly:
+    properties:
+      time.Time:
+        type: string
+    type: object
+  models.GraphEdge:
+    properties:
+      from:
+        type: string
+      to:
+        type: string
+    type: object
+  models.GraphNode:
+    properties:
+      dependencies:
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      duration_days:
+        type: integer
+      end_date:
+        $ref: '#/definitions/models.DateOnly'
+      id:
+        type: string
+      is_critical:
+        type: boolean
+      start_date:
+        $ref: '#/definitions/models.DateOnly'
+      title:
+        type: string
+    type: object
+  models.GraphResponse:
+    properties:
+      edges:
+        items:
+          $ref: '#/definitions/models.GraphEdge'
+        type: array
+      nodes:
+        items:
+          $ref: '#/definitions/models.GraphNode'
+        type: array
+      plan_id:
+        type: string
+    type: object
+  models.InputTask:
+    properties:
+      dependencies:
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      duration_days:
+        type: integer
+      id:
+        type: string
+      title:
+        type: string
+    type: object
+  models.UpdateTaskRequest:
+    properties:
+      dependencies:
+        items:
+          type: string
+        type: array
+      duration_days:
+        type: integer
+      title:
+        type: string
+    type: object
+  models.UpdateTaskResponse:
+    properties:
+      nodes:
+        items:
+          $ref: '#/definitions/models.GraphNode'
+        type: array
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Сервис построения и управления графом зависимостей задач (DAG + CPM)
+  title: Graph Service API
+  version: "1.0"
+paths:
+  /api/graph/plans:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Список задач и дата начала
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.GraphResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создать план из списка задач
+      tags:
+      - graph
+  /api/graph/plans/{id}:
+    get:
+      parameters:
+      - description: Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.GraphResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить план по ID
+      tags:
+      - graph
+  /api/graph/plans/{id}/tasks/{taskId}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      - description: Обновляемые поля задачи
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UpdateTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновить задачу и пересчитать граф
+      tags:
+      - graph
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

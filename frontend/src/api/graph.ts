@@ -1,9 +1,13 @@
 import type { Task, GraphResponse, UpdateTaskResponse } from '../types'
+import { getToken } from './auth'
 
 export async function createPlan(tasks: Task[], startDate?: string): Promise<GraphResponse> {
   const res = await fetch('/api/graph/plans', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getToken()}`,
+    },
     body: JSON.stringify({ tasks, start_date: startDate }),
   })
 
@@ -22,7 +26,10 @@ export async function updateTask(
 ): Promise<UpdateTaskResponse> {
   const res = await fetch(`/api/graph/plans/${planId}/tasks/${taskId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getToken()}`,
+    },
     body: JSON.stringify(patch),
   })
 
