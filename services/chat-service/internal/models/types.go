@@ -8,8 +8,9 @@ type HistoryMessage struct {
 
 // ChatRequest — тело запроса POST /api/chat.
 type ChatRequest struct {
-	Message string           `json:"message" binding:"required"`
-	History []HistoryMessage `json:"history"`
+	Message      string           `json:"message" binding:"required"`
+	History      []HistoryMessage `json:"history"`
+	CurrentTasks []Task           `json:"current_tasks"` // текущий план (если уже есть)
 }
 
 // Task — одна задача в плане.

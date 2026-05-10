@@ -1,0 +1,72 @@
+@startuml fig3_2_sequence
+title Рисунок 3.2 — Диаграмма последовательности: создание плана
+
+skinparam backgroundColor #FAFAFA
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceGroupBorderColor #94A3B8
+skinparam sequenceGroupBackgroundColor #F8FAFC
+skinparam sequenceLifeLineBorderColor #CBD5E1
+skinparam participantBackgroundColor #EEF2FF
+skinparam participantBorderColor #6366F1
+skinparam participantFontSize 12
+skinparam ArrowColor #334155
+skinparam ArrowFontSize 11
+skinparam noteBorderColor #F59E0B
+skinparam noteBackgroundColor #FFFBEB
+
+actor       "Пользователь"  as User
+participant "Frontend\n(React)"     as FE
+participant "chat-service"          as Chat
+participant "Ollama\n(gemma3:4b)"   as LLM
+participant "graph-service"         as Graph
+database    "Neo4j"                 as Neo4j
+database    "PostgreSQL"            as PG
+
+== Аутентификация (однократно) ==
+
+User  -> FE    : ввод email + пароль
+FE    -> FE    : POST /auth/login
+FE    -> FE    : сохранить JWT в localStorage
+
+== Декомпозиция цели ==
+
+User  -> FE    : ввод цели в чате
+FE    -> Chat  : POST /api/chat\n{message, messages: [...история...]}
+note right Chat : Authorization: Bearer <JWT>
+
+Chat  -> LLM   : POST /v1/chat/completions\n{system prompt + few-shot,\n history, user message}
+LLM   -> Chat  : JSON {type, reply, tasks?}
+
+alt type == "question" (недостаточно контекста)
+  Chat  -> FE  : {reply: "Уточняющий вопрос"}
+  FE    -> User : показать вопрос в чате
+  User  -> FE  : ответ пользователя
+  FE    -> Chat : POST /api/chat\n{message, messages: [...обновлённая история...]}
+  Chat  -> LLM  : повторный запрос
+  LLM   -> Chat : JSON {type: "plan", tasks: [...]}
+end
+
+Chat  -> FE    : {reply: "Готово!", tasks: [{id, title, duration_days, dependencies}]}
+
+== Построение графа ==
+
+FE    -> Graph : POST /api/graph/plans\n{tasks, start_date, title}
+note right Graph : Authorization: Bearer <JWT>
+
+group graph-service: алгоритмы
+  Graph -> Graph : TopologicalSort (алг. Кана)\nпроверка на цикл, порядок задач
+  Graph -> Graph : CPM: прямой проход\n(ES, EF для каждой задачи)
+  Graph -> Graph : CPM: обратный проход\n(LS, LF, float, is_critical)
+end
+
+Graph -> Neo4j  : MERGE (t:Task {...})\nMERGE (a)-[:DEPENDS_ON]->(b)
+Graph -> PG     : INSERT plans\n(id, user_id, title, start_date)
+
+Graph -> FE     : GraphResponse\n{plan_id, nodes: [...], edges: [...]}
+
+== Визуализация ==
+
+FE    -> FE    : Cytoscape.js + dagre layout
+FE    -> User  : интерактивный граф\n(критический путь выделен красным)
+
+@enduml

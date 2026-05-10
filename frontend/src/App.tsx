@@ -1,14 +1,12 @@
-import { useState } from 'react'
-import { Button, Typography } from 'antd'
-import { LogoutOutlined } from '@ant-design/icons'
+import { useState, useCallback } from 'react'
 import { ChatPanel } from './components/ChatPanel/ChatPanel'
 import { GraphPanel } from './components/GraphPanel/GraphPanel'
 import { AuthPage } from './components/AuthPage/AuthPage'
+import { PlansList } from './components/PlansList/PlansList'
 import { getToken, clearToken } from './api/auth'
+import { getPlan } from './api/graph'
 import type { Task, GraphNode, GraphEdge } from './types'
 import { createPlan } from './api/graph'
-
-const { Title, Text } = Typography
 
 export function App() {
   const [authed, setAuthed] = useState<boolean>(() => !!getToken())
@@ -16,10 +14,10 @@ export function App() {
   const [graphNodes, setGraphNodes] = useState<GraphNode[]>([])
   const [graphEdges, setGraphEdges] = useState<GraphEdge[]>([])
   const [graphError, setGraphError] = useState<string | null>(null)
+  const [chatKey, setChatKey] = useState(0)
+  const [plansRefresh, setPlansRefresh] = useState(0)
 
-  const handleAuth = () => {
-    setAuthed(true)
-  }
+  const handleAuth = () => setAuthed(true)
 
   const handleLogout = () => {
     clearToken()
@@ -30,17 +28,38 @@ export function App() {
     setGraphError(null)
   }
 
-  const handlePlanReady = async (tasks: Task[]) => {
+  const handlePlanReady = useCallback(async (tasks: Task[], goalTitle?: string) => {
     setGraphError(null)
     try {
       const today = new Date().toISOString().split('T')[0]
-      const graph = await createPlan(tasks, today)
+      const graph = await createPlan(tasks, today, goalTitle)
+      setPlanId(graph.plan_id)
+      setGraphNodes(graph.nodes)
+      setGraphEdges(graph.edges)
+      setPlansRefresh((n) => n + 1)
+    } catch (err) {
+      setGraphError(err instanceof Error ? err.message : 'Ошибка создания графа')
+    }
+  }, [])
+
+  const handleSelectPlan = async (id: string) => {
+    setGraphError(null)
+    try {
+      const graph = await getPlan(id)
       setPlanId(graph.plan_id)
       setGraphNodes(graph.nodes)
       setGraphEdges(graph.edges)
     } catch (err) {
-      setGraphError(err instanceof Error ? err.message : 'Ошибка создания графа')
+      setGraphError(err instanceof Error ? err.message : 'Ошибка загрузки плана')
     }
+  }
+
+  const handleNewPlan = () => {
+    setPlanId(null)
+    setGraphNodes([])
+    setGraphEdges([])
+    setGraphError(null)
+    setChatKey((k) => k + 1)
   }
 
   if (!authed) {
@@ -48,39 +67,36 @@ export function App() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#fafafa' }}>
-      {/* Левая колонка: чат */}
-      <div
-        style={{
-          width: '40%',
-          minWidth: 360,
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#fff',
-          borderRight: '1px solid #f0f0f0',
-          boxShadow: '2px 0 8px rgba(0,0,0,0.04)',
-        }}
-      >
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      {/* Sidebar */}
+      <PlansList
+        activePlanId={planId}
+        onSelectPlan={handleSelectPlan}
+        onNewPlan={handleNewPlan}
+        refreshTrigger={plansRefresh}
+      />
+
+      {/* Chat */}
+      <div className="chat-panel">
+        <div className="chat-header">
           <div>
-            <Title level={4} style={{ margin: 0 }}>Goal Planner</Title>
-            <Text type="secondary" style={{ fontSize: 12 }}>Опишите цель — получите план</Text>
+            <div className="chat-header-title">Планировщик целей</div>
+            <div className="chat-header-sub">Опишите цель — получите план</div>
           </div>
-          <Button
-            type="text"
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-            size="small"
-            title="Выйти"
-          />
+          <button className="logout-btn" onClick={handleLogout} title="Выйти">
+            ⏻
+          </button>
         </div>
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <ChatPanel onPlanReady={handlePlanReady} graphError={graphError} />
-        </div>
+        <ChatPanel
+          key={chatKey}
+          onPlanReady={handlePlanReady}
+          graphError={graphError}
+          currentNodes={graphNodes}
+        />
       </div>
 
-      {/* Правая колонка: граф */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      {/* Graph */}
+      <div className="graph-area">
         <GraphPanel
           planId={planId}
           nodes={graphNodes}

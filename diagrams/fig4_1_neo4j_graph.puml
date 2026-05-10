@@ -1,0 +1,62 @@
+@startuml fig4_1_neo4j_graph
+title Рисунок 4.1 — Пример графа зависимостей в Neo4j\n(цель: «Подготовить и защитить диссертацию к июню»)
+
+skinparam backgroundColor #FAFAFA
+skinparam objectBackgroundColor #EEF2FF
+skinparam objectBorderColor #6366F1
+skinparam objectFontSize 11
+skinparam ArrowColor #475569
+skinparam ArrowFontSize 10
+skinparam ArrowThickness 1.5
+
+' Критические узлы (is_critical = true) — красная рамка
+skinparam object {
+  BackgroundColor #EEF2FF
+  BorderColor #6366F1
+}
+
+object "t1: Выбор темы\nES: 01.01 | EF: 14.01\ndur: 14 д | float: 0" as t1 #FEF2F2 {
+  is_critical = true
+}
+
+object "t2: Обзор литературы\nES: 15.01 | EF: 28.02\ndur: 45 д | float: 0" as t2 #FEF2F2 {
+  is_critical = true
+}
+
+object "t3: Разработка прототипа\nES: 01.03 | EF: 30.04\ndur: 61 д | float: 0" as t3 #FEF2F2 {
+  is_critical = true
+}
+
+object "t4: Написание текста\nES: 01.04 | EF: 20.05\ndur: 50 д | float: 0" as t4 #FEF2F2 {
+  is_critical = true
+}
+
+object "t5: Тестирование\nES: 01.05 | EF: 20.05\ndur: 20 д | float: 10" as t5 #EEF2FF {
+  is_critical = false
+}
+
+object "t6: Защита\nES: 21.05 | EF: 01.06\ndur: 12 д | float: 0" as t6 #FEF2F2 {
+  is_critical = true
+}
+
+t1 --> t2 : DEPENDS_ON\n14 д
+t2 --> t3 : DEPENDS_ON\n45 д
+t2 --> t4 : DEPENDS_ON\n45 д
+t3 --> t4 : DEPENDS_ON\n61 д
+t3 --> t5 : DEPENDS_ON\n61 д
+t4 --> t6 : DEPENDS_ON\n50 д
+t5 --> t6 : DEPENDS_ON\n20 д
+
+note right of t1
+  Красная рамка — критический путь
+  (float == 0)
+  Синяя рамка — задача с резервом
+end note
+
+legend right
+  | Цвет рамки | Значение |
+  | <#DC2626> Красный | Критический путь |
+  | <#6366F1> Синий | Есть резерв |
+endlegend
+
+@enduml

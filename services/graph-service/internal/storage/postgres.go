@@ -12,6 +12,7 @@ import (
 type PlanMeta struct {
 	ID        string
 	UserID    string
+	Title     string
 	StartDate time.Time
 	CreatedAt time.Time
 }
@@ -49,15 +50,16 @@ func (s *PostgresStore) migrate(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		ALTER TABLE plans ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '';
+		ALTER TABLE plans ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';
 	`)
 	return err
 }
 
 // SavePlan сохраняет метаданные нового плана.
-func (s *PostgresStore) SavePlan(ctx context.Context, id, userID string, startDate time.Time) error {
+func (s *PostgresStore) SavePlan(ctx context.Context, id, userID, title string, startDate time.Time) error {
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO plans (id, user_id, start_date) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-		id, userID, startDate,
+		`INSERT INTO plans (id, user_id, title, start_date) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+		id, userID, title, startDate,
 	)
 	return err
 }
@@ -65,13 +67,35 @@ func (s *PostgresStore) SavePlan(ctx context.Context, id, userID string, startDa
 // GetPlan возвращает метаданные плана по ID.
 func (s *PostgresStore) GetPlan(ctx context.Context, id string) (*PlanMeta, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT id, user_id, start_date, created_at FROM plans WHERE id = $1`, id,
+		`SELECT id, user_id, title, start_date, created_at FROM plans WHERE id = $1`, id,
 	)
 	var m PlanMeta
-	if err := row.Scan(&m.ID, &m.UserID, &m.StartDate, &m.CreatedAt); err != nil {
+	if err := row.Scan(&m.ID, &m.UserID, &m.Title, &m.StartDate, &m.CreatedAt); err != nil {
 		return nil, fmt.Errorf("get plan: %w", err)
 	}
 	return &m, nil
+}
+
+// GetUserPlans возвращает список планов пользователя (ID, Title, CreatedAt).
+func (s *PostgresStore) GetUserPlans(ctx context.Context, userID string) ([]PlanMeta, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, user_id, title, start_date, created_at FROM plans WHERE user_id = $1 ORDER BY created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query plans: %w", err)
+	}
+	defer rows.Close()
+
+	var plans []PlanMeta
+	for rows.Next() {
+		var m PlanMeta
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Title, &m.StartDate, &m.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan plan: %w", err)
+		}
+		plans = append(plans, m)
+	}
+	return plans, rows.Err()
 }
 
 // Close закрывает пул соединений.

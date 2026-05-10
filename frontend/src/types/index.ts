@@ -33,6 +33,7 @@ export interface GraphNode {
   end_date: string    // "YYYY-MM-DD"
   is_critical: boolean
   dependencies: string[]
+  status: string      // "todo" | "in_progress" | "done"
 }
 
 export interface GraphEdge {
@@ -48,4 +49,10 @@ export interface GraphResponse {
 
 export interface UpdateTaskResponse {
   nodes: GraphNode[]
+}
+
+export interface PlanListItem {
+  id: string
+  title: string
+  created_at: string
 }

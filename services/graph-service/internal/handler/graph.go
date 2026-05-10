@@ -21,6 +21,28 @@ func NewGraphHandler(svc *service.GraphService) *GraphHandler {
 	return &GraphHandler{svc: svc}
 }
 
+// ListPlans godoc
+//
+//	@Summary		Список планов пользователя
+//	@Tags			graph
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{array}		models.PlanSummary
+//	@Failure		401	{object}	map[string]string
+//	@Router			/api/graph/plans [get]
+func (h *GraphHandler) ListPlans(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	plans, err := h.svc.ListUserPlans(c.Request.Context(), userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if plans == nil {
+		plans = []models.PlanSummary{}
+	}
+	c.JSON(http.StatusOK, plans)
+}
+
 // CreatePlan godoc
 //
 //	@Summary		Создать план из списка задач
@@ -52,7 +74,7 @@ func (h *GraphHandler) CreatePlan(c *gin.Context) {
 	}
 
 	userID, _ := c.Get("userID")
-	resp, err := h.svc.CreatePlan(c.Request.Context(), userID.(string), req.Tasks, startDate)
+	resp, err := h.svc.CreatePlan(c.Request.Context(), userID.(string), req.Title, req.Tasks, startDate)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if isClientError(err) {

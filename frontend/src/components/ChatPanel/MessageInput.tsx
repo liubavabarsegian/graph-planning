@@ -1,6 +1,5 @@
-import { Button, Input } from 'antd'
-import { SendOutlined } from '@ant-design/icons'
 import { useState, type KeyboardEvent } from 'react'
+import { SendOutlined, LoadingOutlined } from '@ant-design/icons'
 
 interface Props {
   onSend: (text: string) => void
@@ -25,23 +24,40 @@ export function MessageInput({ onSend, loading }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #f0f0f0' }}>
-      <Input.TextArea
+    <div className="message-input-wrap">
+      <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Опишите вашу цель... (Enter — отправить, Shift+Enter — новая строка)"
-        autoSize={{ minRows: 1, maxRows: 4 }}
+        placeholder="Опишите вашу цель…"
         disabled={loading}
-        style={{ flex: 1, resize: 'none' }}
+        rows={1}
+        style={{
+          flex: 1,
+          resize: 'none',
+          border: '1px solid #e5e7eb',
+          borderRadius: 9,
+          padding: '8px 10px',
+          fontSize: 13.5,
+          fontFamily: 'inherit',
+          lineHeight: 1.5,
+          outline: 'none',
+          transition: 'border-color 0.15s',
+          background: '#f9f9fb',
+          minHeight: 36,
+          maxHeight: 120,
+          overflowY: 'auto',
+        }}
+        onFocus={(e) => { e.target.style.borderColor = '#6366f1' }}
+        onBlur={(e) => { e.target.style.borderColor = '#e5e7eb' }}
       />
-      <Button
-        type="primary"
-        icon={<SendOutlined />}
+      <button
+        className="send-btn"
         onClick={handleSend}
-        loading={loading}
-        disabled={!value.trim()}
-      />
+        disabled={!value.trim() || loading}
+      >
+        {loading ? <LoadingOutlined /> : <SendOutlined />}
+      </button>
     </div>
   )
 }

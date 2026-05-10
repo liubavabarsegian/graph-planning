@@ -1,0 +1,55 @@
+@startuml fig3_1_components
+title Рисунок 3.1 — Диаграмма компонентов системы
+
+skinparam componentStyle rectangle
+skinparam backgroundColor #FAFAFA
+skinparam component {
+  BackgroundColor #EEF2FF
+  BorderColor #6366F1
+  FontSize 13
+}
+skinparam database {
+  BackgroundColor #F0FDF4
+  BorderColor #10B981
+}
+skinparam node {
+  BackgroundColor #FFFBEB
+  BorderColor #F59E0B
+}
+skinparam ArrowColor #475569
+skinparam ArrowFontSize 11
+
+actor "Пользователь" as User
+
+node "Docker Compose Network" {
+
+  node "frontend : 80" <<Nginx>> {
+    component "React SPA\n(AuthPage, ChatPanel, GraphPanel)" as ReactApp
+    component "Nginx Reverse Proxy" as Nginx
+  }
+
+  component "auth-service : 8082\n(Go / Gin)" as Auth
+  component "chat-service : 8080\n(Go / Gin)" as Chat
+  component "graph-service : 8081\n(Go / Gin)" as Graph
+
+  component "ollama : 11434\n(gemma3:4b)" as Ollama
+
+  database "PostgreSQL : 5432\n(users, plans)" as PG
+  database "Neo4j : 7687\n(Task, DEPENDS_ON)" as Neo4j
+
+}
+
+User --> Nginx : HTTP
+
+Nginx --> ReactApp
+Nginx --> Auth    : /auth/**
+Nginx --> Chat    : /api/chat
+Nginx --> Graph   : /api/graph/**
+
+Chat --> Ollama   : POST /v1/chat/completions
+
+Auth  --> PG      : users
+Graph --> PG      : plans
+Graph --> Neo4j   : Task nodes\nDEPENDS_ON edges
+
+@enduml

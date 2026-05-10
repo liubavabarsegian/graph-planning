@@ -81,6 +81,7 @@ func main() {
 
 	api := r.Group("/api/graph", middleware.RequireAuth())
 	{
+		api.GET("/plans", graphHandler.ListPlans)
 		api.POST("/plans", graphHandler.CreatePlan)
 		api.GET("/plans/:id", graphHandler.GetPlan)
 		api.PATCH("/plans/:id/tasks/:taskId", graphHandler.UpdateTask)

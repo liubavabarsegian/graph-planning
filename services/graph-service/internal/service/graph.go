@@ -24,7 +24,7 @@ func NewGraphService(neo4j *storage.Neo4jStore, postgres *storage.PostgresStore)
 }
 
 // CreatePlan валидирует DAG, вычисляет даты, сохраняет и возвращает граф.
-func (s *GraphService) CreatePlan(ctx context.Context, userID string, tasks []models.InputTask, startDate time.Time) (*models.GraphResponse, error) {
+func (s *GraphService) CreatePlan(ctx context.Context, userID, title string, tasks []models.InputTask, startDate time.Time) (*models.GraphResponse, error) {
 	// 1. Топологическая сортировка (детектирует циклы)
 	order, err := algorithms.TopologicalSort(tasks)
 	if err != nil {
@@ -44,7 +44,7 @@ func (s *GraphService) CreatePlan(ctx context.Context, userID string, tasks []mo
 	// 5. Сохраняем
 	planID := uuid.New().String()
 
-	if err := s.postgres.SavePlan(ctx, planID, userID, startDate); err != nil {
+	if err := s.postgres.SavePlan(ctx, planID, userID, title, startDate); err != nil {
 		return nil, fmt.Errorf("save plan meta: %w", err)
 	}
 	if err := s.neo4j.SavePlan(ctx, planID, nodes); err != nil {
@@ -157,6 +157,27 @@ func nodesToInputTasks(nodes []models.GraphNode) []models.InputTask {
 		}
 	}
 	return tasks
+}
+
+// ListUserPlans возвращает список планов пользователя.
+func (s *GraphService) ListUserPlans(ctx context.Context, userID string) ([]models.PlanSummary, error) {
+	metas, err := s.postgres.GetUserPlans(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]models.PlanSummary, len(metas))
+	for i, m := range metas {
+		title := m.Title
+		if title == "" {
+			title = "План " + m.ID[:8]
+		}
+		result[i] = models.PlanSummary{
+			ID:        m.ID,
+			Title:     title,
+			CreatedAt: m.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	return result, nil
 }
 
 // SetTaskStatus обновляет статус задачи без пересчёта дат.

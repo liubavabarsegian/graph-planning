@@ -67,6 +67,14 @@ type GraphResponse struct {
 type CreatePlanRequest struct {
 	Tasks     []InputTask `json:"tasks"     binding:"required"`
 	StartDate string      `json:"start_date"` // "YYYY-MM-DD", опционально
+	Title     string      `json:"title"`      // название цели
+}
+
+// PlanSummary — краткая информация о плане для списка.
+type PlanSummary struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
 // UpdateTaskRequest — тело PATCH /api/graph/plans/:id/tasks/:taskId.

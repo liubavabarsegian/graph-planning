@@ -27,7 +27,7 @@ import (
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable is required")
+		log.Fatal("OPENAI_API_KEY is not set — edit .env and restart")
 	}
 	if os.Getenv("JWT_SECRET") == "" {
 		log.Fatal("JWT_SECRET environment variable is required")
@@ -38,12 +38,14 @@ func main() {
 		model = "gpt-4o"
 	}
 
+	baseURL := os.Getenv("LLM_BASE_URL") // напр. https://openrouter.ai/api/v1/chat/completions
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	llmClient := llm.NewClient(apiKey, model)
+	llmClient := llm.NewClient(apiKey, model, baseURL)
 	chatService := service.NewChatService(llmClient)
 	chatHandler := handler.NewChatHandler(chatService)
 

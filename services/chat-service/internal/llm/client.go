@@ -6,12 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"chat-service/internal/models"
 )
 
-const openAIURL = "https://api.openai.com/v1/chat/completions"
+const (
+	defaultOpenAIURL     = "https://api.openai.com/v1/chat/completions"
+	defaultOpenRouterURL = "https://openrouter.ai/api/v1/"
+	ollamaURL            = "http://localhost:11434/v1/"
+)
 
 // openAIMessage — формат сообщения для OpenAI Chat API.
 type openAIMessage struct {
@@ -45,31 +50,36 @@ type openAIResponse struct {
 
 // llmResponse — внутренний формат ответа от модели.
 type llmResponse struct {
-	Type  string       `json:"type"`
-	Reply string       `json:"reply"`
+	Type  string        `json:"type"`
+	Reply string        `json:"reply"`
 	Tasks []models.Task `json:"tasks"`
 }
 
-// Client — HTTP-клиент для OpenAI API.
+// Client — HTTP-клиент для OpenAI-совместимого API.
 type Client struct {
 	apiKey     string
 	model      string
+	baseURL    string
 	httpClient *http.Client
 }
 
-// NewClient создаёт клиент с указанным API-ключом и моделью.
-func NewClient(apiKey, model string) *Client {
+// NewClient создаёт клиент. baseURL может быть пустым (используется OpenAI).
+func NewClient(apiKey, model, baseURL string) *Client {
+	if baseURL == "" {
+		baseURL = defaultOpenAIURL
+	}
 	return &Client{
 		apiKey:     apiKey,
 		model:      model,
+		baseURL:    baseURL,
 		httpClient: &http.Client{},
 	}
 }
 
 // Chat отправляет сообщение пользователя вместе с историей в OpenAI
 // и возвращает текст ответа и опциональный план.
-func (c *Client) Chat(ctx context.Context, history []models.HistoryMessage, userMessage string) (reply string, tasks []models.Task, err error) {
-	messages := buildMessages(history, userMessage)
+func (c *Client) Chat(ctx context.Context, history []models.HistoryMessage, userMessage string, currentTasks []models.Task) (reply string, tasks []models.Task, err error) {
+	messages := buildMessages(history, userMessage, currentTasks)
 
 	reqBody := openAIRequest{
 		Model:          c.model,
@@ -83,7 +93,7 @@ func (c *Client) Chat(ctx context.Context, history []models.HistoryMessage, user
 		return "", nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, openAIURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, bytes.NewReader(body))
 	if err != nil {
 		return "", nil, fmt.Errorf("create request: %w", err)
 	}
@@ -107,6 +117,7 @@ func (c *Client) Chat(ctx context.Context, history []models.HistoryMessage, user
 	}
 
 	if oaiResp.Error != nil {
+		log.Printf("openai API error (HTTP %d): %s", resp.StatusCode, oaiResp.Error.Message)
 		return "", nil, fmt.Errorf("openai error: %s", oaiResp.Error.Message)
 	}
 
@@ -130,9 +141,18 @@ func (c *Client) Chat(ctx context.Context, history []models.HistoryMessage, user
 }
 
 // buildMessages собирает массив сообщений для OpenAI из истории и нового сообщения.
-func buildMessages(history []models.HistoryMessage, userMessage string) []openAIMessage {
-	messages := make([]openAIMessage, 0, len(history)+2)
+func buildMessages(history []models.HistoryMessage, userMessage string, currentTasks []models.Task) []openAIMessage {
+	messages := make([]openAIMessage, 0, len(history)+3)
 	messages = append(messages, openAIMessage{Role: "system", Content: SystemPrompt})
+
+	// Если у пользователя уже есть план, инжектируем его как контекст.
+	if len(currentTasks) > 0 {
+		tasksJSON, err := json.Marshal(currentTasks)
+		if err == nil {
+			context := "The user currently has the following plan. If they ask to modify it, return a new complete updated plan with all tasks (including unchanged ones).\n\nCURRENT_PLAN:\n" + string(tasksJSON)
+			messages = append(messages, openAIMessage{Role: "system", Content: context})
+		}
+	}
 
 	for _, h := range history {
 		messages = append(messages, openAIMessage{Role: h.Role, Content: h.Content})

@@ -1,8 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Typography } from 'antd'
 import type { HistoryMessage } from '../../types'
-
-const { Text } = Typography
 
 interface Props {
   messages: HistoryMessage[]
@@ -17,35 +14,18 @@ export function MessageList({ messages }: Props) {
 
   if (messages.length === 0) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb' }}>
-        <Text type="secondary">Опишите свою цель, и я помогу составить план</Text>
+      <div className="messages-empty">
+        <span className="messages-empty-icon">✦</span>
+        <span className="messages-empty-text">Опишите свою цель,<br />и я помогу составить план</span>
       </div>
     )
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="messages-container">
       {messages.map((msg, i) => (
-        <div
-          key={i}
-          style={{
-            display: 'flex',
-            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: '75%',
-              padding: '8px 12px',
-              borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-              background: msg.role === 'user' ? '#1677ff' : '#f5f5f5',
-              color: msg.role === 'user' ? '#fff' : '#000',
-              fontSize: 14,
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
+        <div key={i} className={`message-row ${msg.role}`}>
+          <div className={`message-bubble ${msg.role}`}>
             {msg.content}
           </div>
         </div>

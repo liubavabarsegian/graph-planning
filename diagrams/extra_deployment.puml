@@ -1,0 +1,74 @@
+@startuml extra_deployment
+title Диаграмма развёртывания (Docker Compose)
+
+skinparam backgroundColor #FAFAFA
+skinparam nodeBackgroundColor #EEF2FF
+skinparam nodeBorderColor #6366F1
+skinparam nodeFontSize 12
+skinparam artifactBackgroundColor #F0FDF4
+skinparam artifactBorderColor #10B981
+skinparam databaseBackgroundColor #F0FDF4
+skinparam databaseBorderColor #10B981
+skinparam ArrowColor #475569
+skinparam ArrowFontSize 10
+skinparam componentBackgroundColor #FFFBEB
+skinparam componentBorderColor #F59E0B
+
+node "Машина разработчика / сервер" {
+
+  node "Docker Engine" {
+
+    node "frontend\nnginx:alpine  :80" as FE {
+      artifact "React SPA\n(статические файлы)" as SPA
+      component "nginx.conf\n(reverse proxy)" as NginxConf
+    }
+
+    node "auth-service\ngolang:alpine  :8082" as AuthSvc {
+      artifact "auth-service binary" as AuthBin
+    }
+
+    node "chat-service\ngolang:alpine  :8080" as ChatSvc {
+      artifact "chat-service binary" as ChatBin
+    }
+
+    node "graph-service\ngolang:alpine  :8081" as GraphSvc {
+      artifact "graph-service binary" as GraphBin
+    }
+
+    node "ollama\nollama/ollama  :11434" as OllamaSvc {
+      artifact "gemma3:4b\n(~3 ГБ, volume)" as Model
+    }
+
+    database "postgres:16-alpine\n:5432" as PG {
+      artifact "pg_data (volume)" as PGData
+    }
+
+    database "neo4j:5\n:7474 / :7687" as N4J {
+      artifact "neo4j_data (volume)" as N4JData
+    }
+
+  }
+
+}
+
+actor "Браузер" as Browser
+
+Browser --> FE         : HTTP :80
+
+FE --> AuthSvc         : /auth/**
+FE --> ChatSvc         : /api/chat
+FE --> GraphSvc        : /api/graph/**
+
+ChatSvc --> OllamaSvc  : HTTP :11434
+
+AuthSvc --> PG         : TCP :5432
+GraphSvc --> PG        : TCP :5432
+GraphSvc --> N4J       : Bolt :7687
+
+note bottom of OllamaSvc
+  При первом запуске ollama
+  автоматически скачивает модель
+  (healthcheck ждёт окончания)
+end note
+
+@enduml

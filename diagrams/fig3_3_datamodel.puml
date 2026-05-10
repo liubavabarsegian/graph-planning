@@ -1,0 +1,72 @@
+@startuml fig3_3_datamodel
+title Рисунок 3.3 — Модель данных: PostgreSQL и Neo4j
+
+skinparam backgroundColor #FAFAFA
+skinparam classBackgroundColor #EEF2FF
+skinparam classBorderColor #6366F1
+skinparam classArrowColor #475569
+skinparam classFontSize 12
+skinparam classHeaderBackgroundColor #6366F1
+skinparam classHeaderFontColor #FFFFFF
+skinparam noteBackgroundColor #FFFBEB
+skinparam noteBorderColor #F59E0B
+
+package "PostgreSQL (реляционное хранилище)" #F8FAFC {
+
+  class "users" <<Table>> {
+    + id : UUID <<PK>>
+    --
+    email       : TEXT UNIQUE NOT NULL
+    password_hash : TEXT NOT NULL
+    created_at  : TIMESTAMPTZ DEFAULT now()
+  }
+
+  class "plans" <<Table>> {
+    + id : UUID <<PK>>
+    --
+    user_id    : TEXT NOT NULL
+    title      : TEXT
+    start_date : DATE NOT NULL
+    created_at : TIMESTAMPTZ DEFAULT now()
+  }
+
+  "users" "1" --o{ "plans" : "владеет >"
+
+}
+
+package "Neo4j (графовое хранилище)" #F0FDF4 {
+
+  class "Task" <<Node>> {
+    + id         : string
+    + plan_id    : string
+    --
+    name         : string
+    description  : string
+    duration_days : int
+    status       : string  /'todo | in_progress | done'/
+    start_date   : date    /'ES — ранняя дата начала'/
+    end_date     : date    /'EF — ранняя дата окончания'/
+    early_start  : date
+    early_finish : date
+    late_start   : date
+    late_finish  : date
+    float        : int     /'резерв в днях'/
+    is_critical  : bool
+  }
+
+  class "DEPENDS_ON" <<Relationship>> {
+    (нет атрибутов)
+  }
+
+  "Task" --> "DEPENDS_ON" : source
+  "DEPENDS_ON" --> "Task" : target
+
+}
+
+note bottom of "plans"
+  plan_id в Neo4j совпадает с
+  plans.id в PostgreSQL —
+  связь через общий UUID
+end note
+
+@enduml

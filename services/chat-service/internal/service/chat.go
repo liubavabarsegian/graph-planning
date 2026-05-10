@@ -19,7 +19,7 @@ func NewChatService(llmClient *llm.Client) *ChatService {
 
 // ProcessMessage отправляет сообщение в LLM и возвращает ответ.
 func (s *ChatService) ProcessMessage(ctx context.Context, req models.ChatRequest) (models.ChatResponse, error) {
-	reply, tasks, err := s.llmClient.Chat(ctx, req.History, req.Message)
+	reply, tasks, err := s.llmClient.Chat(ctx, req.History, req.Message, req.CurrentTasks)
 	if err != nil {
 		return models.ChatResponse{}, err
 	}

@@ -1,30 +1,56 @@
 import { useState, useEffect } from 'react'
-import { Modal, Form, InputNumber, Descriptions, Tag, Typography } from 'antd'
+import { Modal, Form, InputNumber, Select, Tag, Button } from 'antd'
 import type { GraphNode } from '../../types'
-
-const { Text } = Typography
 
 interface Props {
   node: GraphNode | null
   onClose: () => void
-  onSave: (nodeId: string, durationDays: number) => Promise<void>
+  onSaveDuration: (nodeId: string, durationDays: number) => Promise<void>
+  onSaveStatus: (nodeId: string, status: string) => Promise<void>
   saving: boolean
 }
 
-export function TaskEditModal({ node, onClose, onSave, saving }: Props) {
-  const [form] = Form.useForm()
+const URL_PATTERN = /https?:\/\/[^\s)]+/
+
+function RichText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s)]+)/)
+  return (
+    <span className="description-text">
+      {parts.map((part, i) =>
+        URL_PATTERN.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer">{part}</a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </span>
+  )
+}
+
+const STATUS_OPTIONS = [
+  { value: 'todo',        label: '○ К выполнению' },
+  { value: 'in_progress', label: '◑ В процессе' },
+  { value: 'done',        label: '● Готово' },
+]
+
+export function TaskEditModal({ node, onClose, onSaveDuration, onSaveStatus, saving }: Props) {
+  const [durationForm] = Form.useForm()
+  const [selectedStatus, setSelectedStatus] = useState<string>('todo')
 
   useEffect(() => {
     if (node) {
-      form.setFieldsValue({ duration_days: node.duration_days })
+      durationForm.setFieldsValue({ duration_days: node.duration_days })
+      setSelectedStatus(node.status || 'todo')
     }
-  }, [node, form])
+  }, [node, durationForm])
 
-  const handleOk = async () => {
-    const values = await form.validateFields()
-    if (node) {
-      await onSave(node.id, values.duration_days)
-    }
+  const handleSaveDuration = async () => {
+    const values = await durationForm.validateFields()
+    if (node) await onSaveDuration(node.id, values.duration_days)
+  }
+
+  const handleSaveStatus = async () => {
+    if (node) await onSaveStatus(node.id, selectedStatus)
   }
 
   if (!node) return null
@@ -32,43 +58,85 @@ export function TaskEditModal({ node, onClose, onSave, saving }: Props) {
   return (
     <Modal
       open={!!node}
-      title={node.title}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{node.title}</span>
+          {node.is_critical && <Tag color="red" style={{ margin: 0, fontSize: 11 }}>Критический путь</Tag>}
+        </div>
+      }
       onCancel={onClose}
-      onOk={handleOk}
-      okText="Пересчитать"
-      cancelText="Закрыть"
-      confirmLoading={saving}
+      footer={null}
+      width={520}
     >
-      <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="Описание">
-          <Text type="secondary">{node.description || '—'}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="Начало">{node.start_date}</Descriptions.Item>
-        <Descriptions.Item label="Конец">{node.end_date}</Descriptions.Item>
-        <Descriptions.Item label="Критический путь">
-          {node.is_critical ? <Tag color="red">да</Tag> : <Tag color="default">нет</Tag>}
-        </Descriptions.Item>
-        {node.dependencies.length > 0 && (
-          <Descriptions.Item label="Зависит от">
-            {node.dependencies.map((d) => (
-              <Tag key={d}>{d}</Tag>
-            ))}
-          </Descriptions.Item>
-        )}
-      </Descriptions>
+      {/* Description */}
+      {node.description && (
+        <div style={{
+          fontSize: 13, color: '#4b5563', lineHeight: 1.65,
+          padding: '10px 12px', background: '#f9f9fb',
+          borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 16,
+        }}>
+          <RichText text={node.description} />
+        </div>
+      )}
 
-      <Form form={form} layout="vertical">
-        <Form.Item
-          name="duration_days"
-          label="Длительность (дней)"
-          rules={[
-            { required: true, message: 'Укажите длительность' },
-            { type: 'number', min: 1, message: 'Минимум 1 день' },
-          ]}
-        >
-          <InputNumber min={1} style={{ width: '100%' }} />
-        </Form.Item>
-      </Form>
+      {/* Dates */}
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16 }}>
+        📅 {node.start_date} → {node.end_date} · {node.duration_days} дней
+        {node.dependencies.length > 0 && (
+          <span style={{ marginLeft: 10 }}>
+            Зависит от: {node.dependencies.map((d) => <Tag key={d} style={{ margin: '0 2px', fontSize: 11 }}>{d}</Tag>)}
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Status */}
+        <div style={{ padding: '12px 14px', background: '#f9f9fb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Статус задачи</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Select
+              value={selectedStatus}
+              onChange={setSelectedStatus}
+              options={STATUS_OPTIONS}
+              style={{ flex: 1 }}
+              disabled={saving}
+            />
+            <Button
+              type="primary"
+              onClick={handleSaveStatus}
+              loading={saving}
+              disabled={selectedStatus === (node.status || 'todo')}
+              style={{ flexShrink: 0 }}
+            >
+              Сохранить
+            </Button>
+          </div>
+        </div>
+
+        {/* Duration */}
+        <div style={{ padding: '12px 14px', background: '#f9f9fb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+            Длительность <span style={{ fontWeight: 400, color: '#9ca3af' }}>(пересчитывает весь граф)</span>
+          </div>
+          <Form form={durationForm} layout="inline">
+            <Form.Item
+              name="duration_days"
+              style={{ marginBottom: 0, flex: 1 }}
+              rules={[
+                { required: true, message: 'Укажите длительность' },
+                { type: 'number', min: 1, message: 'Минимум 1 день' },
+              ]}
+            >
+              <InputNumber min={1} style={{ width: '100%' }} disabled={saving} addonAfter="дней" />
+            </Form.Item>
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button type="primary" onClick={handleSaveDuration} loading={saving}>
+                Пересчитать
+              </Button>
+            </Form.Item>
+          </Form>
+        </div>
+      </div>
     </Modal>
   )
 }

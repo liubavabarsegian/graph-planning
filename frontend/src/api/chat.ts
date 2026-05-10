@@ -1,9 +1,10 @@
-import type { ChatResponse, HistoryMessage } from '../types'
+import type { ChatResponse, HistoryMessage, Task } from '../types'
 import { getToken } from './auth'
 
 export async function sendMessage(
   message: string,
-  history: HistoryMessage[]
+  history: HistoryMessage[],
+  currentTasks?: Task[]
 ): Promise<ChatResponse> {
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -11,7 +12,11 @@ export async function sendMessage(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${getToken()}`,
     },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({
+      message,
+      history,
+      current_tasks: currentTasks && currentTasks.length > 0 ? currentTasks : undefined,
+    }),
   })
 
   if (!res.ok) {

@@ -1,0 +1,59 @@
+@startuml extra_cpm_algorithm
+title Алгоритм построения DAG и вычисления критического пути (CPM)
+
+skinparam backgroundColor #FAFAFA
+skinparam activityBackgroundColor #EEF2FF
+skinparam activityBorderColor #6366F1
+skinparam activityDiamondBackgroundColor #FFFBEB
+skinparam activityDiamondBorderColor #F59E0B
+skinparam ArrowColor #475569
+skinparam ArrowFontSize 11
+skinparam activityFontSize 12
+
+start
+
+:Получить список задач\n{id, title, duration_days, dependencies};
+
+' Топологическая сортировка (алг. Кана)
+:Построить граф смежности **adj**\nи массив степеней входа **inDegree**;
+:Поместить в очередь все задачи\nс inDegree == 0;
+
+repeat
+  :Извлечь задачу **cur** из очереди;
+  :Добавить в топологический порядок **order**;
+  :Для каждого последователя **next**:\ninDegree[next]--;
+  if (inDegree[next] == 0?) then (да)
+    :Добавить **next** в очередь;
+  endif
+repeat while (очередь не пуста?) is (не пуста)
+
+if (len(order) == len(tasks)?) then (нет)
+  #FCA5A5:Ошибка: цикл в графе зависимостей;
+  stop
+endif
+
+' Прямой проход CPM
+note right: **Прямой проход** (forward pass)
+:Для каждой задачи в порядке **order**:;
+:ES[task] = max(EF[dep] + 1 день)\nдля всех предшественников dep;\note right: для задач без предшественников\nES = дата старта проекта
+:EF[task] = ES[task] + duration - 1;
+
+' Обратный проход CPM
+note right: **Обратный проход** (backward pass)
+:projectEnd = max(EF) по всем задачам;
+:Для каждой задачи в обратном порядке **order**:;
+:LF[task] = min(LS[succ] - 1)\nдля всех последователей succ;\note right: для задач без последователей\nLF = projectEnd
+:LS[task] = LF[task] - duration + 1;
+
+' Критический путь
+:Для каждой задачи:\nfloat = LS - ES;
+:is_critical = (float == 0);
+
+:Сохранить узлы Task в Neo4j\n+ рёбра DEPENDS_ON;
+:Сохранить метаданные плана в PostgreSQL;
+
+:Вернуть GraphResponse\n{nodes, edges};
+
+stop
+
+@enduml
