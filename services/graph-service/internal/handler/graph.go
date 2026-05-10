@@ -132,6 +132,44 @@ func (h *GraphHandler) UpdateTask(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// SetTaskStatus godoc
+//
+//	@Summary		Обновить статус задачи (todo/in_progress/done)
+//	@Tags			graph
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		string							true	"Plan ID"
+//	@Param			taskId	path		string							true	"Task ID"
+//	@Param			body	body		models.SetTaskStatusRequest		true	"Новый статус"
+//	@Success		204		"No Content"
+//	@Failure		400		{object}	map[string]string
+//	@Failure		401		{object}	map[string]string
+//	@Failure		404		{object}	map[string]string
+//	@Router			/api/graph/plans/{id}/tasks/{taskId}/status [patch]
+func (h *GraphHandler) SetTaskStatus(c *gin.Context) {
+	planID := c.Param("id")
+	taskID := c.Param("taskId")
+
+	var req models.SetTaskStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	if err := h.svc.SetTaskStatus(c.Request.Context(), userID.(string), planID, taskID, req.Status); err != nil {
+		status := http.StatusInternalServerError
+		if isClientError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 func isClientError(err error) bool {
 	if err == nil {
 		return false

@@ -34,6 +34,7 @@ type InputTask struct {
 	Description  string   `json:"description"`
 	DurationDays int      `json:"duration_days"`
 	Dependencies []string `json:"dependencies"`
+	Status       string   `json:"status"` // "todo" | "in_progress" | "done"
 }
 
 // GraphNode — задача с вычисленными датами и флагом критического пути.
@@ -46,6 +47,7 @@ type GraphNode struct {
 	EndDate      DateOnly `json:"end_date"`
 	IsCritical   bool     `json:"is_critical"`
 	Dependencies []string `json:"dependencies"`
+	Status       string   `json:"status"` // "todo" | "in_progress" | "done"
 }
 
 // GraphEdge — ориентированное ребро зависимости.
@@ -77,4 +79,9 @@ type UpdateTaskRequest struct {
 // UpdateTaskResponse — ответ после пересчёта.
 type UpdateTaskResponse struct {
 	Nodes []GraphNode `json:"nodes"`
+}
+
+// SetTaskStatusRequest — тело PATCH /api/graph/plans/:id/tasks/:taskId/status.
+type SetTaskStatusRequest struct {
+	Status string `json:"status" binding:"required,oneof=todo in_progress done"`
 }

@@ -36,6 +36,10 @@ func (s *Neo4jStore) SavePlan(ctx context.Context, planID string, nodes []models
 	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Создаём узлы
 		for _, n := range nodes {
+			status := n.Status
+			if status == "" {
+				status = "todo"
+			}
 			_, err := tx.Run(ctx, `
 				MERGE (t:Task {id: $id, plan_id: $planID})
 				SET t.title        = $title,
@@ -43,16 +47,18 @@ func (s *Neo4jStore) SavePlan(ctx context.Context, planID string, nodes []models
 				    t.duration_days = $duration,
 				    t.start_date   = $startDate,
 				    t.end_date     = $endDate,
-				    t.is_critical  = $isCritical
+				    t.is_critical  = $isCritical,
+				    t.status       = $status
 			`, map[string]any{
-				"id":         n.ID,
-				"planID":     planID,
-				"title":      n.Title,
+				"id":          n.ID,
+				"planID":      planID,
+				"title":       n.Title,
 				"description": n.Description,
-				"duration":   n.DurationDays,
-				"startDate":  n.StartDate.Format(time.DateOnly),
-				"endDate":    n.EndDate.Format(time.DateOnly),
-				"isCritical": n.IsCritical,
+				"duration":    n.DurationDays,
+				"startDate":   n.StartDate.Format(time.DateOnly),
+				"endDate":     n.EndDate.Format(time.DateOnly),
+				"isCritical":  n.IsCritical,
+				"status":      status,
 			})
 			if err != nil {
 				return nil, err
@@ -144,13 +150,18 @@ func (s *Neo4jStore) UpdateTask(ctx context.Context, planID, taskID string, upda
 
 		// Обновляем свойства узлов
 		for _, n := range updatedNodes {
+			status := n.Status
+			if status == "" {
+				status = "todo"
+			}
 			_, err := tx.Run(ctx, `
 				MATCH (t:Task {id: $id, plan_id: $planID})
 				SET t.title         = $title,
 				    t.duration_days  = $duration,
 				    t.start_date    = $startDate,
 				    t.end_date      = $endDate,
-				    t.is_critical   = $isCritical
+				    t.is_critical   = $isCritical,
+				    t.status        = $status
 			`, map[string]any{
 				"id":         n.ID,
 				"planID":     planID,
@@ -159,6 +170,7 @@ func (s *Neo4jStore) UpdateTask(ctx context.Context, planID, taskID string, upda
 				"startDate":  n.StartDate.Format(time.DateOnly),
 				"endDate":    n.EndDate.Format(time.DateOnly),
 				"isCritical": n.IsCritical,
+				"status":     status,
 			})
 			if err != nil {
 				return nil, err
@@ -189,6 +201,38 @@ func (s *Neo4jStore) UpdateTask(ctx context.Context, planID, taskID string, upda
 	return err
 }
 
+// SetTaskStatus обновляет только поле status одной задачи.
+func (s *Neo4jStore) SetTaskStatus(ctx context.Context, planID, taskID, status string) error {
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (t:Task {id: $taskID, plan_id: $planID})
+			SET t.status = $status
+			RETURN count(t) AS updated
+		`, map[string]any{
+			"taskID": taskID,
+			"planID": planID,
+			"status": status,
+		})
+		if err != nil {
+			return nil, err
+		}
+		rec, err := result.Single(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("task not found: %s", taskID)
+		}
+		updated, _ := rec.Get("updated")
+		if updated.(int64) == 0 {
+			return nil, fmt.Errorf("task not found: %s", taskID)
+		}
+		return nil, nil
+	})
+
+	return err
+}
+
 // Close закрывает драйвер.
 func (s *Neo4jStore) Close(ctx context.Context) {
 	s.driver.Close(ctx)
@@ -208,6 +252,11 @@ func nodeFromProps(props map[string]any, depsRaw any) (models.GraphNode, error) 
 
 	deps := extractStringSlice(depsRaw)
 
+	status := getString(props, "status")
+	if status == "" {
+		status = "todo"
+	}
+
 	return models.GraphNode{
 		ID:           getString(props, "id"),
 		Title:        getString(props, "title"),
@@ -217,6 +266,7 @@ func nodeFromProps(props map[string]any, depsRaw any) (models.GraphNode, error) 
 		EndDate:      models.DateOnly{Time: endDate},
 		IsCritical:   getBool(props, "is_critical"),
 		Dependencies: deps,
+		Status:       status,
 	}, nil
 }
 

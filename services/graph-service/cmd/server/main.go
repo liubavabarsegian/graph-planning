@@ -84,6 +84,7 @@ func main() {
 		api.POST("/plans", graphHandler.CreatePlan)
 		api.GET("/plans/:id", graphHandler.GetPlan)
 		api.PATCH("/plans/:id/tasks/:taskId", graphHandler.UpdateTask)
+		api.PATCH("/plans/:id/tasks/:taskId/status", graphHandler.SetTaskStatus)
 	}
 
 	log.Printf("graph-service starting on :%s", port)

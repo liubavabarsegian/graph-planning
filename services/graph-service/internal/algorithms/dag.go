@@ -145,6 +145,10 @@ func BuildGraphNodes(tasks []models.InputTask, dates map[string]*dateRange, crit
 	nodes := make([]models.GraphNode, 0, len(tasks))
 	for _, t := range tasks {
 		dr := dates[t.ID]
+		status := t.Status
+		if status == "" {
+			status = "todo"
+		}
 		nodes = append(nodes, models.GraphNode{
 			ID:           t.ID,
 			Title:        t.Title,
@@ -154,6 +158,7 @@ func BuildGraphNodes(tasks []models.InputTask, dates map[string]*dateRange, crit
 			EndDate:      models.DateOnly{Time: dr.End},
 			IsCritical:   critical[t.ID],
 			Dependencies: t.Dependencies,
+			Status:       status,
 		})
 	}
 	return nodes

@@ -153,7 +153,21 @@ func nodesToInputTasks(nodes []models.GraphNode) []models.InputTask {
 			Description:  n.Description,
 			DurationDays: n.DurationDays,
 			Dependencies: n.Dependencies,
+			Status:       n.Status,
 		}
 	}
 	return tasks
+}
+
+// SetTaskStatus обновляет статус задачи без пересчёта дат.
+func (s *GraphService) SetTaskStatus(ctx context.Context, userID, planID, taskID, status string) error {
+	meta, err := s.postgres.GetPlan(ctx, planID)
+	if err != nil {
+		return fmt.Errorf("plan not found: %s", planID)
+	}
+	if meta.UserID != "" && meta.UserID != userID {
+		return fmt.Errorf("plan not found: %s", planID)
+	}
+
+	return s.neo4j.SetTaskStatus(ctx, planID, taskID, status)
 }
