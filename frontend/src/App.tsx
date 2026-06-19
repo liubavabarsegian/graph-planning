@@ -37,7 +37,14 @@ export function App() {
       setGraphEdges(graph.edges)
       setPlansRefresh((n) => n + 1)
     } catch (err) {
-      setGraphError(err instanceof Error ? err.message : 'Ошибка создания графа')
+      const msg = err instanceof Error ? err.message : 'Ошибка создания графа'
+      setGraphError(msg)
+      // Сбрасываем граф, чтобы не показывать данные предыдущего плана.
+      // Обновляем сайдбар: план мог частично создаться в БД до ошибки.
+      setPlanId(null)
+      setGraphNodes([])
+      setGraphEdges([])
+      setPlansRefresh((n) => n + 1)
     }
   }, [])
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { sendMessage } from '../../api/chat'
 import type { HistoryMessage, Task, GraphNode } from '../../types'
 import { MessageList } from './MessageList'
@@ -46,6 +46,7 @@ function nodesToTasks(nodes: GraphNode[]): Task[] {
 export function ChatPanel({ planId, onPlanReady, graphError, currentNodes }: Props) {
   const [messages, setMessages] = useState<HistoryMessage[]>(() => loadHistory(planId))
   const [loading, setLoading] = useState(false)
+  const [elapsed, setElapsed] = useState(0)   // секунды ожидания
   const [error, setError] = useState<string | null>(null)
   const [goalTitle, setGoalTitle] = useState<string>('')
   const prevPlanId = useRef<string | null>(planId)
@@ -78,6 +79,13 @@ export function ChatPanel({ planId, onPlanReady, graphError, currentNodes }: Pro
     saveHistory(planId, messages)
   }, [planId, messages])
 
+  // Таймер прошедших секунд — показывает что модель ещё работает.
+  const startTimer = useCallback(() => {
+    setElapsed(0)
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
   const handleSend = async (text: string) => {
     const userMsg: HistoryMessage = { role: 'user', content: text }
     const nextHistory = [...messages, userMsg]
@@ -85,6 +93,7 @@ export function ChatPanel({ planId, onPlanReady, graphError, currentNodes }: Pro
     setMessages(nextHistory)
     setLoading(true)
     setError(null)
+    const stopTimer = startTimer()
 
     if (messages.length === 0) {
       setGoalTitle(text.slice(0, 80))
@@ -103,9 +112,18 @@ export function ChatPanel({ planId, onPlanReady, graphError, currentNodes }: Pro
         onPlanReady(response.plan.tasks, title)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Что-то пошло не так')
+      const raw = err instanceof Error ? err.message : 'Что-то пошло не так'
+      const isConnectionError = raw.toLowerCase().includes('timeout') ||
+        raw.toLowerCase().includes('network') ||
+        raw.toLowerCase().includes('failed to fetch') ||
+        raw === 'Unknown error'
+      setError(isConnectionError
+        ? 'Соединение прервалось. Попробуйте отправить сообщение ещё раз.'
+        : raw)
     } finally {
       setLoading(false)
+      stopTimer()
+      setElapsed(0)
     }
   }
 
@@ -124,6 +142,16 @@ export function ChatPanel({ planId, onPlanReady, graphError, currentNodes }: Pro
       {graphError && (
         <div style={{ margin: '0 12px 8px', padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#b45309' }}>
           Ошибка графа: {graphError}
+        </div>
+      )}
+      {loading && elapsed >= 5 && (
+        <div style={{ margin: '0 12px 8px', padding: '7px 12px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+          {elapsed < 30
+            ? `Модель думает… ${elapsed} с`
+            : elapsed < 90
+            ? `Строю план, это займёт ещё немного… ${elapsed} с`
+            : `Генерирую детальный план… ${elapsed} с`}
         </div>
       )}
       {currentNodes.length > 0 && (

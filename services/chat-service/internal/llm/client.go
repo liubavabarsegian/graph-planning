@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"chat-service/internal/models"
 )
@@ -72,7 +73,7 @@ func NewClient(apiKey, model, baseURL string) *Client {
 		apiKey:     apiKey,
 		model:      model,
 		baseURL:    baseURL,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 5 * time.Minute},
 	}
 }
 
