@@ -4,9 +4,8 @@ import { GraphPanel } from './components/GraphPanel/GraphPanel'
 import { AuthPage } from './components/AuthPage/AuthPage'
 import { PlansList } from './components/PlansList/PlansList'
 import { getToken, clearToken } from './api/auth'
-import { getPlan } from './api/graph'
+import { getPlan, createPlan, deletePlan } from './api/graph'
 import type { Task, GraphNode, GraphEdge } from './types'
-import { createPlan } from './api/graph'
 
 export function App() {
   const [authed, setAuthed] = useState<boolean>(() => !!getToken())
@@ -49,6 +48,7 @@ export function App() {
       setPlanId(graph.plan_id)
       setGraphNodes(graph.nodes)
       setGraphEdges(graph.edges)
+      // Не сбрасываем chatKey — история чата per-planId сохраняется в localStorage
     } catch (err) {
       setGraphError(err instanceof Error ? err.message : 'Ошибка загрузки плана')
     }
@@ -62,6 +62,22 @@ export function App() {
     setChatKey((k) => k + 1)
   }
 
+  const handleDeletePlan = async (id: string) => {
+    try {
+      await deletePlan(id)
+      if (planId === id) {
+        setPlanId(null)
+        setGraphNodes([])
+        setGraphEdges([])
+        setGraphError(null)
+        setChatKey((k) => k + 1)
+      }
+      setPlansRefresh((n) => n + 1)
+    } catch (err) {
+      setGraphError(err instanceof Error ? err.message : 'Ошибка удаления плана')
+    }
+  }
+
   if (!authed) {
     return <AuthPage onAuth={handleAuth} />
   }
@@ -73,6 +89,7 @@ export function App() {
         activePlanId={planId}
         onSelectPlan={handleSelectPlan}
         onNewPlan={handleNewPlan}
+        onDeletePlan={handleDeletePlan}
         refreshTrigger={plansRefresh}
       />
 
@@ -89,6 +106,7 @@ export function App() {
         </div>
         <ChatPanel
           key={chatKey}
+          planId={planId}
           onPlanReady={handlePlanReady}
           graphError={graphError}
           currentNodes={graphNodes}
@@ -101,7 +119,10 @@ export function App() {
           planId={planId}
           nodes={graphNodes}
           edges={graphEdges}
-          onNodesUpdate={setGraphNodes}
+          onNodesUpdate={(nodes, edges) => {
+            setGraphNodes(nodes)
+            if (edges) setGraphEdges(edges)
+          }}
         />
       </div>
     </div>

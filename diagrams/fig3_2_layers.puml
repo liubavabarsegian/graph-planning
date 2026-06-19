@@ -1,0 +1,52 @@
+@startuml fig3_2_layers
+title Рисунок 3.2 — Многоуровневая архитектура Go-сервисов (пример: graph-service)
+
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Inter
+skinparam defaultFontSize 12
+skinparam ArrowColor #475569
+skinparam ArrowThickness 1.5
+
+skinparam rectangle {
+  RoundCorner 10
+}
+
+' ─── Легенда слоёв ───────────────────────────────────────────
+
+rectangle "**HTTP / REST**\n(входящие запросы)" as HTTP #EEF2FF;line:6366F1 {
+}
+
+rectangle "**Слой обработчиков (handler)**\nПриём и валидация HTTP-запросов,\nформирование HTTP-ответов" as Handler #EEF2FF;line:6366F1
+
+rectangle "**Слой бизнес-логики (service)**\nОрхестрация алгоритмов:\nТопологическая сортировка · CPM\nКаскадный пересчёт дат" as Service #FFFBEB;line:F59E0B
+
+rectangle "**Слой хранения данных (storage)**\nАбстракция над БД:\nNeo4jStore · PostgresStore" as Storage #F0FDF4;line:10B981
+
+rectangle "**Слой моделей (models)**\nСтруктуры данных:\nInputTask · GraphNode · GraphEdge" as Models #F8FAFC;line:94A3B8
+
+rectangle "**Инфраструктура**\nNeo4j (граф) · PostgreSQL (метаданные)" as Infra #F0FDF4;line:10B981
+
+HTTP -down-> Handler : JSON
+Handler -down-> Service : domain objects
+Service -down-> Storage : repository calls
+Storage -down-> Infra : Cypher / SQL
+Models .right. Handler : использует
+Models .right. Service : использует
+Models .right. Storage : использует
+
+note right of Handler
+  Не содержит бизнес-логики.
+  Отвечает только за HTTP.
+end note
+
+note right of Service
+  Не зависит от деталей
+  транспорта и хранилища.
+end note
+
+note right of Storage
+  Единственное место,
+  знающее о Neo4j и SQL.
+end note
+
+@enduml

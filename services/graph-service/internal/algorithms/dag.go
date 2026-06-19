@@ -66,11 +66,18 @@ func ComputeDates(tasks []models.InputTask, order []string, startDate time.Time)
 
 		for _, depID := range t.Dependencies {
 			if dr, ok := dates[depID]; ok {
-				// задача может начаться только на следующий день после окончания зависимости
 				candidate := dr.End.AddDate(0, 0, 1)
 				if candidate.After(taskStart) {
 					taskStart = candidate
 				}
+			}
+		}
+
+		// Принудительная дата начала: задача не может начаться раньше неё.
+		if t.ForcedStart != nil {
+			forced := truncateToDay(t.ForcedStart.Time)
+			if forced.After(taskStart) {
+				taskStart = forced
 			}
 		}
 
@@ -149,6 +156,15 @@ func BuildGraphNodes(tasks []models.InputTask, dates map[string]*dateRange, crit
 		if status == "" {
 			status = "todo"
 		}
+		// Генерируем IDs для subtasks, если они пришли без ID (из LLM через frontend).
+		subtasks := make([]models.Subtask, len(t.Subtasks))
+		for i, sub := range t.Subtasks {
+			id := sub.ID
+			if id == "" {
+				id = fmt.Sprintf("s%d", i+1)
+			}
+			subtasks[i] = models.Subtask{ID: id, Title: sub.Title, Done: sub.Done}
+		}
 		nodes = append(nodes, models.GraphNode{
 			ID:           t.ID,
 			Title:        t.Title,
@@ -159,6 +175,8 @@ func BuildGraphNodes(tasks []models.InputTask, dates map[string]*dateRange, crit
 			IsCritical:   critical[t.ID],
 			Dependencies: t.Dependencies,
 			Status:       status,
+			Subtasks:     subtasks,
+			ForcedStart:  t.ForcedStart,
 		})
 	}
 	return nodes

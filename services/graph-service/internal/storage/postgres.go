@@ -98,6 +98,20 @@ func (s *PostgresStore) GetUserPlans(ctx context.Context, userID string) ([]Plan
 	return plans, rows.Err()
 }
 
+// DeletePlan удаляет метаданные плана из PostgreSQL.
+func (s *PostgresStore) DeletePlan(ctx context.Context, id, userID string) error {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM plans WHERE id = $1 AND user_id = $2`, id, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete plan: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("plan not found: %s", id)
+	}
+	return nil
+}
+
 // Close закрывает пул соединений.
 func (s *PostgresStore) Close() {
 	s.pool.Close()

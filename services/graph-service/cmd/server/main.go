@@ -64,7 +64,7 @@ func main() {
 
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "POST, GET, PATCH, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "POST, GET, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -84,8 +84,13 @@ func main() {
 		api.GET("/plans", graphHandler.ListPlans)
 		api.POST("/plans", graphHandler.CreatePlan)
 		api.GET("/plans/:id", graphHandler.GetPlan)
+		api.DELETE("/plans/:id", graphHandler.DeletePlan)
+		api.POST("/plans/:id/tasks", graphHandler.AddTask)
 		api.PATCH("/plans/:id/tasks/:taskId", graphHandler.UpdateTask)
+		api.DELETE("/plans/:id/tasks/:taskId", graphHandler.DeleteTask)
 		api.PATCH("/plans/:id/tasks/:taskId/status", graphHandler.SetTaskStatus)
+		api.POST("/plans/:id/tasks/:taskId/subtasks", graphHandler.AddSubtask)
+		api.PATCH("/plans/:id/tasks/:taskId/subtasks/:subtaskId", graphHandler.UpdateSubtask)
 	}
 
 	log.Printf("graph-service starting on :%s", port)

@@ -1,5 +1,5 @@
 import type { ChatResponse, HistoryMessage, Task } from '../types'
-import { getToken } from './auth'
+import { getToken, handleUnauthorized } from './auth'
 
 export async function sendMessage(
   message: string,
@@ -19,6 +19,10 @@ export async function sendMessage(
     }),
   })
 
+  if (res.status === 401) {
+    handleUnauthorized()
+    throw new Error('Сессия истекла, выполните вход снова')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Unknown error' }))
     throw new Error(err.error ?? `HTTP ${res.status}`)

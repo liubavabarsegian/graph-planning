@@ -27,27 +27,38 @@ func (d *DateOnly) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Subtask — подзадача внутри задачи (чеклист).
+type Subtask struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Done  bool   `json:"done"`
+}
+
 // InputTask — задача, пришедшая от фронтенда (из chat-service).
 type InputTask struct {
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	Description  string   `json:"description"`
-	DurationDays int      `json:"duration_days"`
-	Dependencies []string `json:"dependencies"`
-	Status       string   `json:"status"` // "todo" | "in_progress" | "done"
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	DurationDays int       `json:"duration_days"`
+	Dependencies []string  `json:"dependencies"`
+	Status       string    `json:"status"` // "todo" | "in_progress" | "done"
+	Subtasks     []Subtask `json:"subtasks"`
+	ForcedStart  *DateOnly `json:"forced_start,omitempty"` // принудительная дата начала
 }
 
 // GraphNode — задача с вычисленными датами и флагом критического пути.
 type GraphNode struct {
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	Description  string   `json:"description"`
-	DurationDays int      `json:"duration_days"`
-	StartDate    DateOnly `json:"start_date"`
-	EndDate      DateOnly `json:"end_date"`
-	IsCritical   bool     `json:"is_critical"`
-	Dependencies []string `json:"dependencies"`
-	Status       string   `json:"status"` // "todo" | "in_progress" | "done"
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	DurationDays int       `json:"duration_days"`
+	StartDate    DateOnly  `json:"start_date"`
+	EndDate      DateOnly  `json:"end_date"`
+	IsCritical   bool      `json:"is_critical"`
+	Dependencies []string  `json:"dependencies"`
+	Status       string    `json:"status"` // "todo" | "in_progress" | "done"
+	Subtasks     []Subtask `json:"subtasks"`
+	ForcedStart  *DateOnly `json:"forced_start,omitempty"` // принудительная дата начала
 }
 
 // GraphEdge — ориентированное ребро зависимости.
@@ -81,7 +92,10 @@ type PlanSummary struct {
 type UpdateTaskRequest struct {
 	DurationDays *int     `json:"duration_days"`
 	Title        *string  `json:"title"`
+	Description  *string  `json:"description"`
 	Dependencies []string `json:"dependencies"`
+	StartDate    *string  `json:"start_date"`  // "YYYY-MM-DD" — принудительная дата начала
+	EndDate      *string  `json:"end_date"`    // "YYYY-MM-DD" — пересчитывает duration
 }
 
 // UpdateTaskResponse — ответ после пересчёта.
@@ -92,4 +106,23 @@ type UpdateTaskResponse struct {
 // SetTaskStatusRequest — тело PATCH /api/graph/plans/:id/tasks/:taskId/status.
 type SetTaskStatusRequest struct {
 	Status string `json:"status" binding:"required,oneof=todo in_progress done"`
+}
+
+// AddTaskRequest — тело POST /api/graph/plans/:id/tasks.
+type AddTaskRequest struct {
+	Title        string   `json:"title"         binding:"required"`
+	Description  string   `json:"description"`
+	DurationDays int      `json:"duration_days" binding:"required,min=1"`
+	Dependencies []string `json:"dependencies"` // задачи, от которых зависит новая
+	Successors   []string `json:"successors"`   // задачи, которые будут зависеть от новой
+}
+
+// AddSubtaskRequest — тело POST /api/graph/plans/:id/tasks/:taskId/subtasks.
+type AddSubtaskRequest struct {
+	Title string `json:"title" binding:"required"`
+}
+
+// UpdateSubtaskRequest — тело PATCH /api/graph/plans/:id/tasks/:taskId/subtasks/:subtaskId.
+type UpdateSubtaskRequest struct {
+	Done bool `json:"done"`
 }

@@ -112,7 +112,8 @@ body {
 
 .plan-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   width: 100%;
   padding: 8px 10px;
   background: transparent;
@@ -122,7 +123,38 @@ body {
   text-align: left;
   transition: background 0.13s;
   margin-bottom: 1px;
+  gap: 4px;
+}
+
+.plan-item > div {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+}
+
+.plan-delete-btn {
+  flex-shrink: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.plan-item:hover .plan-delete-btn {
+  display: flex;
+}
+
+.plan-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .plan-item:hover {

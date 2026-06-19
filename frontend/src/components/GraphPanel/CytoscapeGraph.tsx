@@ -13,14 +13,19 @@ interface Props {
   onNodeClick: (node: GraphNode) => void
 }
 
-// status (non-critical): { bg, border, text }
-const STATUS_STYLE: Record<string, { bg: string; border: string; text: string }> = {
-  todo:        { bg: '#eef2ff', border: '#6366f1', text: '#312e81' },
-  in_progress: { bg: '#fffbeb', border: '#f59e0b', text: '#78350f' },
-  done:        { bg: '#ecfdf5', border: '#10b981', text: '#064e3b' },
+// Классы узла по статусу × критичность (для CSS-стилей Cytoscape).
+function nodeClass(n: GraphNode): string {
+  const parts: string[] = [`st-${n.status || 'todo'}`]
+  if (n.is_critical && n.status !== 'done') parts.push('critical')
+  return parts.join(' ')
 }
-const CRITICAL_STYLE = { bg: '#fef2f2', border: '#dc2626', text: '#7f1d1d' }
-const DEFAULT_STYLE = STATUS_STYLE.todo
+
+// Цвет текста по статусу × критичность.
+function textColor(n: GraphNode): string {
+  if (n.status === 'done') return '#166534'
+  if (n.status === 'in_progress') return n.is_critical ? '#7c2d12' : '#78350f'
+  return n.is_critical ? '#7f1d1d' : '#1e293b'
+}
 
 export function CytoscapeGraph({ nodes, edges, onNodeClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -29,31 +34,28 @@ export function CytoscapeGraph({ nodes, edges, onNodeClick }: Props) {
   useEffect(() => {
     if (!containerRef.current) return
 
-    // Build a lookup: node id → duration_days (for edge labels)
     const durationById: Record<string, number> = {}
     for (const n of nodes) durationById[n.id] = n.duration_days
 
     const elements: cytoscape.ElementDefinition[] = [
       ...nodes.map((n) => {
-        const st = n.is_critical ? CRITICAL_STYLE : (STATUS_STYLE[n.status] ?? DEFAULT_STYLE)
+        const subtasks = n.subtasks ?? []
+        const doneCount = subtasks.filter(s => s.done).length
+        const progress = subtasks.length > 0 ? `${doneCount}/${subtasks.length}` : ''
         return {
           data: {
             id: n.id,
-            label: buildLabel(n),
-            isCritical: n.is_critical,
-            status: n.status || 'todo',
-            bg: st.bg,
-            border: st.border,
-            textColor: st.text,
+            label: buildLabel(n, progress),
+            textColor: textColor(n),
             raw: n,
           },
+          classes: nodeClass(n),
         }
       }),
       ...edges.map((e) => ({
         data: {
           source: e.from,
           target: e.to,
-          isCritical: false, // filled below
           label: durationById[e.from] != null ? `${durationById[e.from]}д` : '',
         },
       })),
@@ -65,56 +67,91 @@ export function CytoscapeGraph({ nodes, edges, onNodeClick }: Props) {
       layout: {
         name: 'dagre',
         rankDir: 'LR',
-        nodeSep: 28,
-        rankSep: 110,
-        padding: 36,
+        nodeSep: 24,
+        rankSep: 100,
+        padding: 48,
         animate: false,
       } as cytoscape.LayoutOptions,
       style: [
+        // ── базовый стиль узла ───────────────────────────────────────────
         {
           selector: 'node',
           style: {
             shape: 'roundrectangle',
-            width: 168,
-            height: 58,
-            'background-color': 'data(bg)',
-            'border-width': 2,
-            'border-color': 'data(border)',
+            width: 180,
+            height: 64,
+            'background-color': '#ffffff',
+            'border-width': 1,
+            'border-color': '#e2e8f0',
             label: 'data(label)',
             color: 'data(textColor)',
             'text-valign': 'center',
             'text-halign': 'center',
             'font-size': '11px',
-            'font-family': 'Inter, system-ui, sans-serif',
+            'font-family': '"Inter", "SF Pro Display", system-ui, sans-serif',
+            'font-weight': 500,
             'text-wrap': 'wrap',
-            'text-max-width': '152px',
-            'line-height': 1.45,
+            'text-max-width': '155px',
+            'line-height': 1.5,
           },
         },
+        // ── К выполнению (не крит.) ──────────────────────────────────────
         {
-          selector: 'node[?isCritical]',
+          selector: 'node.st-todo',
           style: {
-            'border-width': 2.5,
+            'background-color': '#f8fafc',
+            'border-color': '#cbd5e1',
           },
         },
+        // ── К выполнению КРИТИЧЕСКОЕ ─────────────────────────────────────
         {
-          selector: 'node[status = "done"]',
+          selector: 'node.st-todo.critical',
           style: {
-            opacity: 0.8,
+            'background-color': '#fef2f2',
+            'border-color': '#fca5a5',
+            'border-width': 2,
           },
         },
+        // ── В процессе ───────────────────────────────────────────────────
+        {
+          selector: 'node.st-in_progress',
+          style: {
+            'background-color': '#fffbeb',
+            'border-color': '#fde68a',
+            'border-width': 2,
+          },
+        },
+        // ── В процессе КРИТИЧЕСКОЕ ───────────────────────────────────────
+        {
+          selector: 'node.st-in_progress.critical',
+          style: {
+            'background-color': '#fff7ed',
+            'border-color': '#fdba74',
+            'border-width': 2,
+          },
+        },
+        // ── Готово ───────────────────────────────────────────────────────
+        {
+          selector: 'node.st-done',
+          style: {
+            'background-color': '#f0fdf4',
+            'border-color': '#bbf7d0',
+            opacity: 0.78,
+          },
+        },
+        // ── Выбранный ────────────────────────────────────────────────────
         {
           selector: 'node:selected',
           style: {
-            'border-width': 3,
-            'border-color': '#facc15',
-            'background-color': 'data(bg)',
+            'border-width': 2.5,
+            'border-color': '#6366f1',
           },
         },
         {
           selector: 'node:active',
-          style: { 'overlay-opacity': 0.06 },
+          style: { 'overlay-opacity': 0.04 },
         },
+        // ── Рёбра ────────────────────────────────────────────────────────
         {
           selector: 'edge',
           style: {
@@ -123,16 +160,15 @@ export function CytoscapeGraph({ nodes, edges, onNodeClick }: Props) {
             'target-arrow-color': '#94a3b8',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
-            'arrow-scale': 1.0,
+            'arrow-scale': 0.9,
             label: 'data(label)',
             'font-size': '10px',
-            'font-family': 'Inter, system-ui, sans-serif',
+            'font-family': '"Inter", system-ui, sans-serif',
             color: '#94a3b8',
-            'text-background-color': '#f8f9fc',
+            'text-background-color': '#f8fafc',
             'text-background-opacity': 1,
             'text-background-padding': '2px',
             'text-background-shape': 'roundrectangle',
-            'text-border-opacity': 0,
           },
         },
         {
@@ -140,24 +176,41 @@ export function CytoscapeGraph({ nodes, edges, onNodeClick }: Props) {
           style: {
             width: 2,
             'line-color': '#fca5a5',
-            'target-arrow-color': '#f87171',
-            color: '#dc2626',
+            'target-arrow-color': '#ef4444',
+            color: '#ef4444',
             'text-background-color': '#fef2f2',
+          },
+        },
+        {
+          selector: 'edge.done-edge',
+          style: {
+            width: 1.5,
+            'line-color': '#86efac',
+            'target-arrow-color': '#16a34a',
+            color: '#16a34a',
+            'text-background-color': '#f0fdf4',
           },
         },
       ],
       userZoomingEnabled: true,
       userPanningEnabled: true,
       boxSelectionEnabled: false,
-      minZoom: 0.25,
+      minZoom: 0.2,
       maxZoom: 3,
     })
 
-    // Mark critical edges
+    // Раскрашиваем рёбра
     cy.edges().forEach((edge) => {
       const src = cy.getElementById(edge.data('source'))
       const tgt = cy.getElementById(edge.data('target'))
-      if (src.data('isCritical') && tgt.data('isCritical')) {
+      const srcDone  = src.hasClass('st-done')
+      const tgtDone  = tgt.hasClass('st-done')
+      const srcCrit  = src.hasClass('critical')
+      const tgtCrit  = tgt.hasClass('critical')
+
+      if (srcDone && tgtDone) {
+        edge.addClass('done-edge')
+      } else if (srcCrit && tgtCrit) {
         edge.addClass('critical')
       }
     })
@@ -167,55 +220,80 @@ export function CytoscapeGraph({ nodes, edges, onNodeClick }: Props) {
     })
 
     cyRef.current = cy
-
-    return () => {
-      cy.destroy()
-      cyRef.current = null
-    }
+    return () => { cy.destroy(); cyRef.current = null }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      <Legend />
+      <Legend nodes={nodes} />
     </div>
   )
 }
 
-function Legend() {
-  const items = [
-    { color: '#6366f1', bg: '#eef2ff', label: 'К выполнению' },
-    { color: '#f59e0b', bg: '#fffbeb', label: 'В процессе' },
-    { color: '#10b981', bg: '#ecfdf5', label: 'Готово' },
-    { color: '#dc2626', bg: '#fef2f2', label: 'Критический путь' },
-  ]
+function Legend({ nodes }: { nodes: GraphNode[] }) {
+  const total      = nodes.length
+  const done       = nodes.filter(n => n.status === 'done').length
+  const inProgress = nodes.filter(n => n.status === 'in_progress').length
+  const critical   = nodes.filter(n => n.is_critical && n.status !== 'done').length
+
   return (
     <div style={{
-      position: 'absolute', bottom: 14, right: 14,
-      background: 'rgba(255,255,255,0.95)',
-      border: '1px solid #e5e7eb',
-      borderRadius: 10, padding: '8px 12px',
-      fontSize: 11, display: 'flex', flexDirection: 'column', gap: 5,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+      position: 'absolute', bottom: 16, right: 16,
+      background: 'rgba(255,255,255,0.97)',
+      border: '1px solid #e2e8f0', borderRadius: 12,
+      padding: '12px 14px', fontSize: 11,
+      display: 'flex', flexDirection: 'column', gap: 7,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.08)', minWidth: 175,
     }}>
-      {items.map(({ color, bg, label }) => (
-        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={{
-            width: 14, height: 10, borderRadius: 3, flexShrink: 0,
-            background: bg, border: `2px solid ${color}`,
-          }} />
-          <span style={{ color: '#4b5563' }}>{label}</span>
+      <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 11, letterSpacing: '0.03em' }}>
+        ЛЕГЕНДА
+      </div>
+      <LegendItem bg="#f8fafc" border="#cbd5e1" label="К выполнению" />
+      <LegendItem bg="#fffbeb" border="#fde68a" label="В процессе" bold />
+      <LegendItem bg="#f0fdf4" border="#bbf7d0" label="Готово" />
+      <LegendItem bg="#fef2f2" border="#fca5a5" label="Критический путь" thick />
+      <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 2, paddingTop: 7, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <StatRow label="Выполнено"   value={`${done} / ${total}`} color="#16a34a" />
+        {inProgress > 0 && <StatRow label="В работе"    value={String(inProgress)} color="#d97706" />}
+        {critical   > 0 && <StatRow label="На крит. пути" value={String(critical)} color="#ef4444" />}
+        <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 1 }}>
+          Цифра на стрелке — длит. предка (дней)
         </div>
-      ))}
-      <div style={{ borderTop: '1px solid #f0f0f0', marginTop: 3, paddingTop: 5, color: '#9ca3af', fontSize: 10 }}>
-        Число на стрелке — длительность предшественника
       </div>
     </div>
   )
 }
 
-function buildLabel(n: GraphNode): string {
-  const title = n.title.length > 26 ? n.title.slice(0, 24) + '…' : n.title
-  return `${title}\n${n.start_date} → ${n.end_date}`
+function LegendItem({ bg, border, label, bold, thick }: {
+  bg: string; border: string; label: string; bold?: boolean; thick?: boolean
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{
+        width: 22, height: 14, borderRadius: 4, flexShrink: 0,
+        background: bg, border: `${thick ? 2 : 1}px solid ${border}`,
+        boxSizing: 'border-box',
+      }} />
+      <span style={{ color: '#374151', fontWeight: bold ? 600 : 400 }}>{label}</span>
+    </div>
+  )
+}
+
+function StatRow({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+      <span style={{ color: '#6b7280' }}>{label}</span>
+      <span style={{ color, fontWeight: 600 }}>{value}</span>
+    </div>
+  )
+}
+
+function buildLabel(n: GraphNode, progress: string): string {
+  const maxLen = 24
+  const title = n.title.length > maxLen ? n.title.slice(0, maxLen - 1) + '…' : n.title
+  const icon = n.status === 'done' ? '✓ ' : n.status === 'in_progress' ? '◑ ' : ''
+  const prog = progress ? ` [${progress}]` : ''
+  return `${icon}${title}${prog}\n${n.start_date} → ${n.end_date}`
 }

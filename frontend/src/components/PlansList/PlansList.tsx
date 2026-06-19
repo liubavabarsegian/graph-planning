@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Spin } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { Spin, Popconfirm } from 'antd'
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import { listPlans } from '../../api/graph'
 import type { PlanListItem } from '../../types'
 
@@ -8,12 +8,14 @@ interface Props {
   activePlanId: string | null
   onSelectPlan: (planId: string) => void
   onNewPlan: () => void
+  onDeletePlan: (planId: string) => Promise<void>
   refreshTrigger: number
 }
 
-export function PlansList({ activePlanId, onSelectPlan, onNewPlan, refreshTrigger }: Props) {
+export function PlansList({ activePlanId, onSelectPlan, onNewPlan, onDeletePlan, refreshTrigger }: Props) {
   const [plans, setPlans] = useState<PlanListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -22,6 +24,16 @@ export function PlansList({ activePlanId, onSelectPlan, onNewPlan, refreshTrigge
       .catch(() => setPlans([]))
       .finally(() => setLoading(false))
   }, [refreshTrigger])
+
+  const handleDelete = async (e: React.MouseEvent, planId: string) => {
+    e.stopPropagation()
+    setDeletingId(planId)
+    try {
+      await onDeletePlan(planId)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
@@ -50,15 +62,36 @@ export function PlansList({ activePlanId, onSelectPlan, onNewPlan, refreshTrigge
       ) : (
         <div className="plan-list">
           {plans.map((p) => (
-            <button
+            <div
               key={p.id}
               className={`plan-item${activePlanId === p.id ? ' active' : ''}`}
               onClick={() => onSelectPlan(p.id)}
               title={p.title}
             >
-              <span className="plan-item-title">{p.title || 'Без названия'}</span>
-              <span className="plan-item-date">{formatDate(p.created_at)}</span>
-            </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span className="plan-item-title">{p.title || 'Без названия'}</span>
+                <span className="plan-item-date">{formatDate(p.created_at)}</span>
+              </div>
+              <Popconfirm
+                title="Удалить план?"
+                description="Это действие нельзя отменить."
+                onConfirm={(e) => handleDelete(e as React.MouseEvent, p.id)}
+                onCancel={(e) => e?.stopPropagation()}
+                okText="Удалить"
+                cancelText="Отмена"
+                okButtonProps={{ danger: true }}
+                placement="right"
+              >
+                <button
+                  className="plan-delete-btn"
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={deletingId === p.id}
+                  title="Удалить план"
+                >
+                  <DeleteOutlined style={{ fontSize: 11 }} />
+                </button>
+              </Popconfirm>
+            </div>
           ))}
         </div>
       )}

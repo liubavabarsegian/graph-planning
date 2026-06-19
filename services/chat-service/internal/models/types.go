@@ -20,6 +20,7 @@ type Task struct {
 	Description  string   `json:"description"`
 	DurationDays int      `json:"duration_days"`
 	Dependencies []string `json:"dependencies"`
+	Subtasks     []string `json:"subtasks"` // краткие пункты чеклиста (3-5 штук)
 }
 
 // Plan — список задач, возвращаемый вместе с ответом.

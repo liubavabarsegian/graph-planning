@@ -12,6 +12,12 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+// При получении 401 от любого API-запроса — сразу чистим токен и перезагружаем страницу.
+export function handleUnauthorized(): void {
+  clearToken()
+  window.location.reload()
+}
+
 export async function login(email: string, password: string): Promise<string> {
   const res = await fetch('/auth/login', {
     method: 'POST',

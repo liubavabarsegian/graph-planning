@@ -11,6 +11,7 @@ export interface Task {
   description: string
   duration_days: number
   dependencies: string[]
+  subtasks?: Array<{ id: string; title: string; done: boolean }>
 }
 
 export interface Plan {
@@ -24,6 +25,12 @@ export interface ChatResponse {
 
 // --- Graph types ---
 
+export interface Subtask {
+  id: string
+  title: string
+  done: boolean
+}
+
 export interface GraphNode {
   id: string
   title: string
@@ -34,6 +41,8 @@ export interface GraphNode {
   is_critical: boolean
   dependencies: string[]
   status: string      // "todo" | "in_progress" | "done"
+  subtasks: Subtask[]
+  forced_start?: string // "YYYY-MM-DD"
 }
 
 export interface GraphEdge {

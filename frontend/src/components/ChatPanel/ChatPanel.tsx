@@ -1,13 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { sendMessage } from '../../api/chat'
 import type { HistoryMessage, Task, GraphNode } from '../../types'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 
 interface Props {
+  planId: string | null
   onPlanReady: (tasks: Task[], goalTitle?: string) => void
   graphError: string | null
   currentNodes: GraphNode[]
+}
+
+const STORAGE_KEY = (planId: string) => `chat_history_${planId}`
+
+function loadHistory(planId: string | null): HistoryMessage[] {
+  if (!planId) return []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY(planId))
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(planId: string | null, messages: HistoryMessage[]) {
+  if (!planId) return
+  try {
+    localStorage.setItem(STORAGE_KEY(planId), JSON.stringify(messages.slice(-100)))
+  } catch {
+    // localStorage full — игнорируем
+  }
 }
 
 /** Convert GraphNodes to Task format for sending to LLM */
@@ -21,11 +43,40 @@ function nodesToTasks(nodes: GraphNode[]): Task[] {
   }))
 }
 
-export function ChatPanel({ onPlanReady, graphError, currentNodes }: Props) {
-  const [messages, setMessages] = useState<HistoryMessage[]>([])
+export function ChatPanel({ planId, onPlanReady, graphError, currentNodes }: Props) {
+  const [messages, setMessages] = useState<HistoryMessage[]>(() => loadHistory(planId))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [goalTitle, setGoalTitle] = useState<string>('')
+  const prevPlanId = useRef<string | null>(planId)
+  // Ref для доступа к актуальным messages внутри useEffect без добавления в deps.
+  const messagesRef = useRef<HistoryMessage[]>(messages)
+  useEffect(() => { messagesRef.current = messages }, [messages])
+
+  // Когда planId меняется:
+  // - null → newId: план только что создан из текущего диалога — мигрируем историю.
+  // - oldId → newId: пользователь выбрал другой план — загружаем его историю.
+  useEffect(() => {
+    if (prevPlanId.current === planId) return
+    const prevId = prevPlanId.current
+    prevPlanId.current = planId
+
+    if (prevId === null && planId !== null && messagesRef.current.length > 0) {
+      // Только что создали план из активного диалога — мигрируем историю.
+      saveHistory(planId, messagesRef.current)
+    } else {
+      // Переключение на существующий план (из истории, после перезагрузки страницы и т.д.)
+      // — загружаем сохранённую историю. Важно: НЕ перезаписываем пустым массивом.
+      setMessages(loadHistory(planId))
+      setGoalTitle('')
+      setError(null)
+    }
+  }, [planId])
+
+  // Сохраняем историю при каждом изменении.
+  useEffect(() => {
+    saveHistory(planId, messages)
+  }, [planId, messages])
 
   const handleSend = async (text: string) => {
     const userMsg: HistoryMessage = { role: 'user', content: text }
@@ -44,7 +95,8 @@ export function ChatPanel({ onPlanReady, graphError, currentNodes }: Props) {
     try {
       const response = await sendMessage(text, messages, currentTasks)
       const assistantMsg: HistoryMessage = { role: 'assistant', content: response.reply }
-      setMessages([...nextHistory, assistantMsg])
+      const withAssistant = [...nextHistory, assistantMsg]
+      setMessages(withAssistant)
 
       if (response.plan) {
         const title = goalTitle || text.slice(0, 80)
